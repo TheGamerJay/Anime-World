@@ -1,0 +1,186 @@
+{
+  "meta": {
+    "persona": "E1: The Anti-AI Designer",
+    "project": "Neon Tokyo Anime Streamer",
+    "platform": "React Native Expo",
+    "theme": "Cotton Candy Cyberpunk"
+  },
+  "design_system": {
+    "colors": {
+      "background": {
+        "default": "#09090B",
+        "surface": "#121214",
+        "card": "#18181B",
+        "overlay": "rgba(9, 9, 11, 0.8)"
+      },
+      "brand": {
+        "primary": "#00F0FF",
+        "primary_dim": "rgba(0, 240, 255, 0.2)",
+        "secondary": "#FF0099",
+        "secondary_dim": "rgba(255, 0, 153, 0.2)",
+        "accent": "#7000FF",
+        "success": "#00FF94",
+        "warning": "#FFD600",
+        "error": "#FF0055"
+      },
+      "text": {
+        "primary": "#FFFFFF",
+        "secondary": "#A1A1AA",
+        "muted": "#52525B",
+        "inverse": "#000000"
+      },
+      "gradients": {
+        "cotton_candy": ["#00F0FF", "#FF0099"],
+        "deep_space": ["#09090B", "#18181B"],
+        "hero_fade": ["transparent", "#09090B"]
+      }
+    },
+    "typography": {
+      "font_family": {
+        "headings": "System",
+        "body": "System",
+        "mono": "System"
+      },
+      "styles": {
+        "h1": { "fontSize": 32, "fontWeight": "800", "letterSpacing": -0.5, "lineHeight": 40, "color": "#FFFFFF" },
+        "h2": { "fontSize": 24, "fontWeight": "700", "letterSpacing": -0.3, "lineHeight": 32, "color": "#FFFFFF" },
+        "h3": { "fontSize": 20, "fontWeight": "600", "letterSpacing": -0.2, "lineHeight": 28, "color": "#FFFFFF" },
+        "body_lg": { "fontSize": 16, "fontWeight": "400", "lineHeight": 24, "color": "#A1A1AA" },
+        "body_sm": { "fontSize": 14, "fontWeight": "400", "lineHeight": 20, "color": "#A1A1AA" },
+        "caption": { "fontSize": 12, "fontWeight": "500", "lineHeight": 16, "color": "#52525B", "textTransform": "uppercase", "letterSpacing": 1 }
+      }
+    },
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32,
+      "xxl": 48,
+      "safe_area": 44
+    },
+    "layout": {
+      "radius": {
+        "sm": 8,
+        "md": 16,
+        "lg": 24,
+        "full": 9999
+      },
+      "container": {
+        "paddingHorizontal": 16
+      }
+    }
+  },
+  "assets": {
+    "images": {
+      "hero_banners": [
+        "https://images.unsplash.com/photo-1672872476232-da16b45c9001?q=80&w=1200",
+        "https://images.unsplash.com/photo-1604315841269-a1f298321670?q=80&w=1200",
+        "https://images.unsplash.com/photo-1599009876320-01a3d33c197d?q=80&w=1200"
+      ],
+      "thumbnails": [
+        "https://images.unsplash.com/photo-1557266730-f5f77d8ab2eb?q=80&w=600",
+        "https://images.unsplash.com/photo-1682925100789-3f0e76d65c6a?q=80&w=600",
+        "https://images.unsplash.com/photo-1764178952791-c8aea5613e0b?q=80&w=600",
+        "https://images.unsplash.com/photo-1600748338443-f7ea1054ed6b?q=80&w=600"
+      ]
+    },
+    "icons": {
+      "library": "@expo/vector-icons",
+      "set": "Ionicons",
+      "mapping": {
+        "home": "home",
+        "home_outline": "home-outline",
+        "browse": "compass",
+        "browse_outline": "compass-outline",
+        "watchlist": "bookmark",
+        "watchlist_outline": "bookmark-outline",
+        "profile": "person",
+        "profile_outline": "person-outline",
+        "search": "search",
+        "play": "play",
+        "pause": "pause",
+        "close": "close",
+        "back": "chevron-back",
+        "filter": "options"
+      }
+    }
+  },
+  "components": {
+    "Button": {
+      "variants": {
+        "primary": {
+          "background": ["#00F0FF", "#FF0099"],
+          "text_color": "#000000",
+          "border": "none"
+        },
+        "secondary": {
+          "background": "#18181B",
+          "text_color": "#FFFFFF",
+          "border": "#27272A"
+        },
+        "ghost": {
+          "background": "transparent",
+          "text_color": "#00F0FF",
+          "border": "none"
+        }
+      },
+      "default_props": {
+        "height": 48,
+        "borderRadius": 9999,
+        "activeOpacity": 0.8
+      }
+    },
+    "Card": {
+      "style": {
+        "backgroundColor": "#121214",
+        "borderColor": "#27272A",
+        "borderWidth": 1,
+        "borderRadius": 16,
+        "overflow": "hidden"
+      }
+    },
+    "Input": {
+      "style": {
+        "backgroundColor": "#18181B",
+        "borderColor": "#27272A",
+        "borderWidth": 1,
+        "borderRadius": 12,
+        "height": 48,
+        "color": "#FFFFFF",
+        "paddingHorizontal": 16
+      }
+    }
+  },
+  "screens": {
+    "Home": {
+      "layout_strategy": "Hero Carousel (Parallax) -> Trending (Horizontal) -> Categories (Grid)",
+      "hero_height": "60%"
+    },
+    "Browse": {
+      "layout_strategy": "Search Bar (Sticky) -> Genre Chips (Horizontal) -> Result Grid (2 col)",
+      "grid_gap": 16
+    },
+    "Player": {
+      "layout_strategy": "Video (Top) -> Info Tabs (Below) -> Up Next (List)",
+      "controls_overlay": "rgba(0,0,0,0.6)"
+    }
+  },
+  "universal_guidelines": [
+    "NEVER use plain black (#000000) for backgrounds; use #09090B to avoid OLED smearing and harsh contrast.",
+    "ALWAYS use StyleSheet.create for performance.",
+    "Touchable targets must be at least 44x44 points.",
+    "Use LinearGradient for primary buttons to achieve the 'Cotton Candy' look.",
+    "Text over images MUST have a gradient overlay (transparent -> black) for readability.",
+    "Avoid CSS-in-JS libraries; stick to native styling or Tailwind-like utility objects if pre-configured.",
+    "Images should fade in upon loading.",
+    "Use 'safe-area-context' for all screen containers."
+  ],
+  "instructions_to_main_agent": [
+    "Use 'expo-linear-gradient' for the cotton candy backgrounds.",
+    "Implement the 'Bento Grid' by alternating column spans in FlatList or SectionList.",
+    "Use 'expo-blur' (BlurView) for the bottom tab bar background if supported, otherwise use 95% opacity black.",
+    "Ensure all lists (FlatList) have 'contentContainerStyle={{ paddingBottom: 100 }}' to avoid tab bar overlap.",
+    "Mock API calls with the provided Unsplash images."
+  ]
+}
