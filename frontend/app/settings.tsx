@@ -18,6 +18,8 @@ export default function SettingsScreen() {
   const [subtitles, setSubtitles] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [selectedQuality, setSelectedQuality] = useState('Auto');
+  const [showLanguages, setShowLanguages] = useState(false);
+  const [showQuality, setShowQuality] = useState(false);
 
   const handleClearCache = () => {
     Alert.alert('Clear Cache', 'This will clear cached anime data and images.', [
@@ -59,8 +61,15 @@ export default function SettingsScreen() {
         {/* Video Quality */}
         <Text style={styles.sectionLabel}>VIDEO QUALITY</Text>
         <View style={styles.section}>
-          {['Auto', '1080p', '720p', '480p', '360p'].map((q, idx, arr) => (
-            <TouchableOpacity key={q} testID={`quality-${q}`} onPress={() => setSelectedQuality(q)} style={[styles.selectItem, idx === arr.length - 1 && styles.lastItem]}>
+          <TouchableOpacity testID="quality-toggle" onPress={() => setShowQuality(!showQuality)} style={styles.expandableItem}>
+            <View style={styles.expandableLeft}>
+              <Text style={styles.expandableLabel}>Video Quality</Text>
+              <Text style={styles.expandableValue}>{selectedQuality}</Text>
+            </View>
+            <Ionicons name={showQuality ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.text.muted} />
+          </TouchableOpacity>
+          {showQuality && ['Auto', '1080p', '720p', '480p', '360p'].map((q, idx, arr) => (
+            <TouchableOpacity key={q} testID={`quality-${q}`} onPress={() => { setSelectedQuality(q); setShowQuality(false); }} style={[styles.selectItem, idx === arr.length - 1 && styles.lastItem]}>
               <Text style={styles.selectLabel}>{q}</Text>
               {selectedQuality === q && <Ionicons name="checkmark-circle" size={22} color={Colors.brand.cyan} />}
             </TouchableOpacity>
@@ -70,8 +79,15 @@ export default function SettingsScreen() {
         {/* Language */}
         <Text style={styles.sectionLabel}>LANGUAGE</Text>
         <View style={styles.section}>
-          {['English', 'Japanese', 'Spanish', 'French', 'Portuguese', 'German', 'Italian', 'Russian', 'Korean', 'Chinese', 'Arabic', 'Hindi', 'Thai', 'Indonesian', 'Vietnamese', 'Turkish', 'Polish', 'Dutch', 'Swedish', 'Norwegian'].map((lang, idx, arr) => (
-            <TouchableOpacity key={lang} testID={`lang-${lang}`} onPress={() => setSelectedLanguage(lang)} style={[styles.selectItem, idx === arr.length - 1 && styles.lastItem]}>
+          <TouchableOpacity testID="language-toggle" onPress={() => setShowLanguages(!showLanguages)} style={styles.expandableItem}>
+            <View style={styles.expandableLeft}>
+              <Text style={styles.expandableLabel}>Preferred Language</Text>
+              <Text style={styles.expandableValue}>{selectedLanguage}</Text>
+            </View>
+            <Ionicons name={showLanguages ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.text.muted} />
+          </TouchableOpacity>
+          {showLanguages && ['English', 'Japanese', 'Spanish', 'French', 'Portuguese', 'German', 'Italian', 'Russian', 'Korean', 'Chinese', 'Arabic', 'Hindi', 'Thai', 'Indonesian', 'Vietnamese', 'Turkish', 'Polish', 'Dutch', 'Swedish', 'Norwegian'].map((lang, idx, arr) => (
+            <TouchableOpacity key={lang} testID={`lang-${lang}`} onPress={() => { setSelectedLanguage(lang); setShowLanguages(false); }} style={[styles.selectItem, idx === arr.length - 1 && styles.lastItem]}>
               <Text style={styles.selectLabel}>{lang}</Text>
               {selectedLanguage === lang && <Ionicons name="checkmark-circle" size={22} color={Colors.brand.cyan} />}
             </TouchableOpacity>
@@ -149,9 +165,13 @@ const styles = StyleSheet.create({
   toggleItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14 },
   toggleLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
   itemBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  selectItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  selectItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.bg.elevated },
   lastItem: { borderBottomWidth: 0 },
   selectLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
+  expandableItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 16 },
+  expandableLeft: { flex: 1 },
+  expandableLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
+  expandableValue: { fontSize: 13, color: Colors.brand.cyan, fontWeight: '600', marginTop: 2 },
   actionItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
   actionLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
   infoItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
