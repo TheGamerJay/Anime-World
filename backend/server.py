@@ -465,6 +465,212 @@ async def my_earnings(user=Depends(get_current_user)):
     transactions = await db.payment_transactions.find({"creator_id": user["id"], "payment_status": "paid"}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return {"transactions": transactions, "total_earnings": user.get("total_earnings", 0), "balance": user.get("balance", 0)}
 
+# ============ CREATOR ANALYTICS DASHBOARD ============
+@api_router.get("/analytics/creator")
+async def get_creator_analytics(user=Depends(get_current_user)):
+    if not user.get("is_creator"):
+        raise HTTPException(status_code=403, detail="Not a creator")
+    
+    # Get all paid transactions where this user is the creator
+    all_transactions = await db.payment_transactions.find(
+        {"creator_id": user["id"], "payment_status": "paid"}, {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    
+    # Calculate revenue breakdown
+    tips_gross = sum(t["amount"] for t in all_transactions if t.get("type") == "tip")
+    channel_subs_gross = sum(t["amount"] for t in all_transactions if t.get("type") == "channel_sub")
+    total_gross = tips_gross + channel_subs_gross
+    platform_fee = total_gross * PLATFORM_CUT
+    total_net = total_gross - platform_fee
+    
+    # Get unique supporters
+    supporter_ids = list(set(t.get("user_id") for t in all_transactions if t.get("user_id")))
+    supporters = await db.users.find({"id": {"$in": supporter_ids}}, {"_id": 0, "password_hash": 0}).to_list(100)
+    supporter_map = {s["id"]: s for s in supporters}
+    
+    # Group transactions by supporter
+    supporter_totals = {}
+    for t in all_transactions:
+        uid = t.get("user_id")
+        if uid:
+            if uid not in supporter_totals:
+                supporter_totals[uid] = {"tips": 0, "subs": 0, "total": 0, "count": 0}
+            supporter_totals[uid]["total"] += t["amount"]
+            supporter_totals[uid]["count"] += 1
+            if t.get("type") == "tip":
+                supporter_totals[uid]["tips"] += t["amount"]
+            elif t.get("type") == "channel_sub":
+                supporter_totals[uid]["subs"] += t["amount"]
+    
+    # Build top supporters list
+    top_supporters = []
+    for uid, stats in sorted(supporter_totals.items(), key=lambda x: x[1]["total"], reverse=True)[:20]:
+        supporter_info = supporter_map.get(uid, {})
+        top_supporters.append({
+            "user_id": uid,
+            "username": supporter_info.get("username", "Anonymous"),
+            "avatar_color": supporter_info.get("avatar_color", "#00F0FF"),
+            "total_amount": stats["total"],
+            "tips_amount": stats["tips"],
+            "subs_amount": stats["subs"],
+            "transaction_count": stats["count"]
+        })
+    
+    # Transaction history with usernames
+    recent_transactions = []
+    for t in all_transactions[:50]:
+        supporter_info = supporter_map.get(t.get("user_id"), {})
+        recent_transactions.append({
+            **t,
+            "supporter_username": supporter_info.get("username", "Anonymous"),
+            "supporter_avatar_color": supporter_info.get("avatar_color", "#00F0FF"),
+            "gross_amount": t["amount"],
+            "platform_fee": t["amount"] * PLATFORM_CUT,
+            "net_amount": t["amount"] * (1 - PLATFORM_CUT)
+        })
+    
+    # Get series stats
+    series_list = await db.series.find({"creator_id": user["id"]}, {"_id": 0}).to_list(50)
+    total_views = sum(s.get("view_count", 0) for s in series_list)
+    total_likes = sum(s.get("like_count", 0) for s in series_list)
+    
+    # Monthly breakdown (last 6 months)
+    from datetime import timedelta
+    monthly_data = []
+    now = datetime.now(timezone.utc)
+    for i in range(6):
+        month_start = (now.replace(day=1) - timedelta(days=i*30)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        month_transactions = [t for t in all_transactions if month_start.isoformat() <= t.get("created_at", "") < month_end.isoformat()]
+        month_gross = sum(t["amount"] for t in month_transactions)
+        monthly_data.append({
+            "month": month_start.strftime("%b %Y"),
+            "gross_revenue": month_gross,
+            "net_revenue": month_gross * (1 - PLATFORM_CUT),
+            "transaction_count": len(month_transactions)
+        })
+    monthly_data.reverse()
+    
+    return {
+        "summary": {
+            "total_gross_revenue": total_gross,
+            "total_platform_fee": platform_fee,
+            "total_net_revenue": total_net,
+            "tips_gross": tips_gross,
+            "channel_subs_gross": channel_subs_gross,
+            "available_balance": user.get("balance", 0),
+            "total_supporters": len(supporter_ids),
+            "total_transactions": len(all_transactions),
+            "total_views": total_views,
+            "total_likes": total_likes,
+            "follower_count": user.get("follower_count", 0),
+            "series_count": len(series_list),
+            "platform_fee_percentage": PLATFORM_CUT * 100
+        },
+        "top_supporters": top_supporters,
+        "recent_transactions": recent_transactions,
+        "monthly_breakdown": monthly_data,
+        "series_performance": sorted(series_list, key=lambda x: x.get("view_count", 0), reverse=True)
+    }
+
+# ============ FAN ANALYTICS DASHBOARD ============
+@api_router.get("/analytics/fan")
+async def get_fan_analytics(user=Depends(get_current_user)):
+    # Get all paid transactions where this user is the payer
+    all_transactions = await db.payment_transactions.find(
+        {"user_id": user["id"], "payment_status": "paid"}, {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    
+    # Calculate spending breakdown
+    tips_total = sum(t["amount"] for t in all_transactions if t.get("type") == "tip")
+    premium_total = sum(t["amount"] for t in all_transactions if t.get("type") == "premium")
+    channel_subs_total = sum(t["amount"] for t in all_transactions if t.get("type") == "channel_sub")
+    total_spent = tips_total + premium_total + channel_subs_total
+    
+    # Get unique creators supported
+    creator_ids = list(set(t.get("creator_id") for t in all_transactions if t.get("creator_id")))
+    creators = await db.users.find({"id": {"$in": creator_ids}}, {"_id": 0, "password_hash": 0}).to_list(100)
+    creator_map = {c["id"]: c for c in creators}
+    
+    # Group transactions by creator
+    creator_totals = {}
+    for t in all_transactions:
+        cid = t.get("creator_id")
+        if cid:
+            if cid not in creator_totals:
+                creator_totals[cid] = {"tips": 0, "subs": 0, "total": 0, "count": 0, "last_date": ""}
+            creator_totals[cid]["total"] += t["amount"]
+            creator_totals[cid]["count"] += 1
+            if t.get("type") == "tip":
+                creator_totals[cid]["tips"] += t["amount"]
+            elif t.get("type") == "channel_sub":
+                creator_totals[cid]["subs"] += t["amount"]
+            if t.get("created_at", "") > creator_totals[cid]["last_date"]:
+                creator_totals[cid]["last_date"] = t.get("created_at", "")
+    
+    # Build supported creators list
+    supported_creators = []
+    for cid, stats in sorted(creator_totals.items(), key=lambda x: x[1]["total"], reverse=True):
+        creator_info = creator_map.get(cid, {})
+        supported_creators.append({
+            "creator_id": cid,
+            "username": creator_info.get("username", "Unknown"),
+            "avatar_color": creator_info.get("avatar_color", "#00F0FF"),
+            "bio": creator_info.get("bio", ""),
+            "total_given": stats["total"],
+            "tips_given": stats["tips"],
+            "subs_given": stats["subs"],
+            "support_count": stats["count"],
+            "last_support_date": stats["last_date"]
+        })
+    
+    # Transaction history with creator info
+    recent_transactions = []
+    for t in all_transactions[:50]:
+        creator_info = creator_map.get(t.get("creator_id"), {})
+        recent_transactions.append({
+            **t,
+            "creator_username": creator_info.get("username", "Platform"),
+            "creator_avatar_color": creator_info.get("avatar_color", "#00F0FF"),
+        })
+    
+    # Monthly spending (last 6 months)
+    from datetime import timedelta
+    monthly_data = []
+    now = datetime.now(timezone.utc)
+    for i in range(6):
+        month_start = (now.replace(day=1) - timedelta(days=i*30)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_end = (month_start + timedelta(days=32)).replace(day=1)
+        month_transactions = [t for t in all_transactions if month_start.isoformat() <= t.get("created_at", "") < month_end.isoformat()]
+        monthly_data.append({
+            "month": month_start.strftime("%b %Y"),
+            "total_spent": sum(t["amount"] for t in month_transactions),
+            "tips": sum(t["amount"] for t in month_transactions if t.get("type") == "tip"),
+            "subs": sum(t["amount"] for t in month_transactions if t.get("type") == "channel_sub"),
+            "transaction_count": len(month_transactions)
+        })
+    monthly_data.reverse()
+    
+    # Get following list
+    following = await db.follows.find({"follower_id": user["id"]}, {"_id": 0}).to_list(100)
+    following_ids = [f["following_id"] for f in following]
+    
+    return {
+        "summary": {
+            "total_spent": total_spent,
+            "tips_total": tips_total,
+            "premium_total": premium_total,
+            "channel_subs_total": channel_subs_total,
+            "creators_supported": len(creator_ids),
+            "total_transactions": len(all_transactions),
+            "following_count": len(following_ids),
+            "is_premium": user.get("is_premium", False)
+        },
+        "supported_creators": supported_creators,
+        "recent_transactions": recent_transactions,
+        "monthly_spending": monthly_data
+    }
+
 # ============ SEED DATA ============
 @api_router.post("/seed")
 async def seed_data():

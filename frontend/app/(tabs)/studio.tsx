@@ -186,20 +186,27 @@ export default function StudioScreen() {
         </View>
 
         {/* Earnings Card */}
-        <View style={styles.earningsCard}>
-          <LinearGradient colors={[Colors.brand.cyan + '20', Colors.brand.pink + '20']} style={StyleSheet.absoluteFill} />
-          <View style={styles.earningsRow}>
-            <View style={styles.earningItem}>
-              <Text style={styles.earningLabel}>Total Earnings</Text>
-              <Text style={styles.earningValue}>{formatMoney(earnings.total_earnings)}</Text>
+        <TouchableOpacity onPress={() => router.push('/creator-dashboard')} activeOpacity={0.8}>
+          <View style={styles.earningsCard}>
+            <LinearGradient colors={[Colors.brand.cyan + '20', Colors.brand.pink + '20']} style={StyleSheet.absoluteFill} />
+            <View style={styles.earningsRow}>
+              <View style={styles.earningItem}>
+                <Text style={styles.earningLabel}>Total Earnings</Text>
+                <Text style={styles.earningValue}>{formatMoney(earnings.total_earnings)}</Text>
+              </View>
+              <View style={styles.earningDivider} />
+              <View style={styles.earningItem}>
+                <Text style={styles.earningLabel}>Available Balance</Text>
+                <Text style={[styles.earningValue, { color: Colors.brand.success }]}>{formatMoney(earnings.balance)}</Text>
+              </View>
             </View>
-            <View style={styles.earningDivider} />
-            <View style={styles.earningItem}>
-              <Text style={styles.earningLabel}>Available Balance</Text>
-              <Text style={[styles.earningValue, { color: Colors.brand.success }]}>{formatMoney(earnings.balance)}</Text>
+            <View style={styles.viewAnalyticsRow}>
+              <Ionicons name="analytics" size={16} color={Colors.brand.cyan} />
+              <Text style={styles.viewAnalyticsText}>View Full Analytics</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.brand.cyan} />
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* My Series */}
         <View style={styles.sectionHeader}>
@@ -310,6 +317,11 @@ const styles = StyleSheet.create({
   earningLabel: { color: Colors.text.muted, fontSize: 12, marginBottom: 4 },
   earningValue: { color: Colors.text.primary, fontSize: 24, fontWeight: '800' },
   earningDivider: { width: 1, backgroundColor: Colors.border },
+  viewAnalyticsRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  viewAnalyticsText: { color: Colors.brand.cyan, fontSize: 13, fontWeight: '600' },
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: Spacing.md, marginTop: Spacing.lg, marginBottom: Spacing.sm,

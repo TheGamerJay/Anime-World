@@ -139,8 +139,12 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
-        {/* App Menu */}
+        {/* Analytics Menu */}
         <View style={styles.menuSection}>
+          <MenuItem icon="heart" label="My Support History" onPress={() => router.push('/fan-dashboard')} />
+          {user.is_creator && (
+            <MenuItem icon="analytics" label="Creator Analytics" onPress={() => router.push('/creator-dashboard')} />
+          )}
           <MenuItem icon="time-outline" label="Watch History" onPress={() => router.push('/history')} />
           <MenuItem icon="settings-outline" label="Settings" onPress={() => router.push('/settings')} isLast />
         </View>

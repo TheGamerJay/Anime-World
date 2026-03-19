@@ -107,6 +107,12 @@ export const myContentAPI = {
   getMyEarnings: () => apiCall('/my/earnings', { auth: true }),
 };
 
+// Analytics
+export const analyticsAPI = {
+  getCreatorAnalytics: () => apiCall('/analytics/creator', { auth: true }),
+  getFanAnalytics: () => apiCall('/analytics/fan', { auth: true }),
+};
+
 // Payments
 export const paymentsAPI = {
   createTip: (tipSize: string, creatorId: string, originUrl: string) =>
