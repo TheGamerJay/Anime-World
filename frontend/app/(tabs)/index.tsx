@@ -151,7 +151,12 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.logo}>ANIME<Text style={styles.logoPink}>ROLL</Text></Text>
-          {!user && (
+          {user ? (
+            <View style={styles.userBadge}>
+              <Ionicons name="person-circle" size={28} color={Colors.brand.cyan} />
+              <Text style={styles.userNameText}>{user.username}</Text>
+            </View>
+          ) : (
             <TouchableOpacity testID="login-btn" onPress={() => router.push('/auth')} style={styles.loginHeaderBtn}>
               <Text style={styles.loginHeaderText}>Sign In</Text>
             </TouchableOpacity>
@@ -167,7 +172,7 @@ export default function HomeScreen() {
           data={trending.slice(0, 15)}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => `trending-${item.mal_id}`}
+          keyExtractor={(item, index) => `trending-${item.mal_id}-${index}`}
           contentContainerStyle={styles.horizontalList}
           renderItem={({ item }) => (
             <AnimeCard item={item} onPress={() => navigateToAnime(item.mal_id)} />
@@ -180,7 +185,7 @@ export default function HomeScreen() {
           data={popular.slice(0, 15)}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => `popular-${item.mal_id}`}
+          keyExtractor={(item, index) => `popular-${item.mal_id}-${index}`}
           contentContainerStyle={styles.horizontalList}
           renderItem={({ item }) => (
             <AnimeCard item={item} onPress={() => navigateToAnime(item.mal_id)} />
@@ -193,7 +198,7 @@ export default function HomeScreen() {
           data={upcoming.slice(0, 15)}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => `upcoming-${item.mal_id}`}
+          keyExtractor={(item, index) => `upcoming-${item.mal_id}-${index}`}
           contentContainerStyle={styles.horizontalList}
           renderItem={({ item }) => (
             <AnimeCard item={item} onPress={() => navigateToAnime(item.mal_id)} />
@@ -222,6 +227,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.brand.cyan,
   },
   loginHeaderText: { color: Colors.brand.cyan, fontWeight: '600', fontSize: 13 },
+  userBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  userNameText: { color: Colors.brand.cyan, fontWeight: '600', fontSize: 14 },
   heroContainer: { width: SCREEN_WIDTH, height: SCREEN_WIDTH * 1.1, position: 'relative' },
   heroImage: { width: '100%', height: '100%' },
   heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },

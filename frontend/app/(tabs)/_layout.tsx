@@ -1,21 +1,19 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { Colors } from '../../src/theme';
-import { AuthProvider } from '../../src/AuthContext';
 
 export default function TabsLayout() {
   return (
-    <AuthProvider>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: styles.tabBar,
-          tabBarActiveTintColor: Colors.brand.cyan,
-          tabBarInactiveTintColor: Colors.text.muted,
-          tabBarLabelStyle: styles.tabLabel,
-        }}
-      >
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: Colors.brand.cyan,
+        tabBarInactiveTintColor: Colors.text.muted,
+        tabBarLabelStyle: styles.tabLabel,
+      }}
+    >
         <Tabs.Screen
           name="index"
           options={{
@@ -53,7 +51,6 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-    </AuthProvider>
   );
 }
 
