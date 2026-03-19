@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query, Request, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -12,79 +12,34 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
-import httpx
 import jwt
 import bcrypt
-import asyncio
-import time
+import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'anime_app')]
+db = client[os.environ.get('DB_NAME', 'anime_world')]
 
-# JWT Config
-JWT_SECRET = os.environ.get('JWT_SECRET', 'anime-cotton-candy-secret-key-2026')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'anime-world-creator-secret-2026')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 72
 
-# Jikan API
-JIKAN_BASE_URL = "https://api.jikan.moe/v4"
+STRIPE_API_KEY = os.environ.get('STRIPE_API_KEY', '')
 
 app = FastAPI(title="Anime World API")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ============ JIKAN CACHE ============
-_cache: Dict[str, tuple] = {}
-CACHE_TTL = 3600  # 1 hour
-_last_request_time = 0.0
-_request_lock = asyncio.Lock()
+# Stripe setup
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
-
-async def jikan_fetch(endpoint: str, params: Optional[dict] = None) -> Dict[str, Any]:
-    global _last_request_time
-    cache_key = f"{endpoint}_{str(sorted((params or {}).items()))}"
-
-    if cache_key in _cache:
-        data, cached_at = _cache[cache_key]
-        if time.time() - cached_at < CACHE_TTL:
-            return data
-
-    async with _request_lock:
-        now = time.time()
-        wait_time = max(0, 0.35 - (now - _last_request_time))
-        if wait_time > 0:
-            await asyncio.sleep(wait_time)
-
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as http_client:
-                resp = await http_client.get(f"{JIKAN_BASE_URL}{endpoint}", params=params)
-                _last_request_time = time.time()
-                if resp.status_code == 429:
-                    await asyncio.sleep(1)
-                    resp = await http_client.get(f"{JIKAN_BASE_URL}{endpoint}", params=params)
-                    _last_request_time = time.time()
-                resp.raise_for_status()
-                data = resp.json()
-                _cache[cache_key] = (data, time.time())
-                return data
-        except httpx.HTTPStatusError as e:
-            logger.error(f"Jikan API error {e.response.status_code}: {endpoint}")
-            raise HTTPException(status_code=e.response.status_code, detail="Jikan API error")
-        except Exception as e:
-            logger.error(f"Jikan fetch error: {str(e)}")
-            raise HTTPException(status_code=502, detail="Failed to fetch from anime API")
-
-
-# ============ AUTH MODELS ============
+# ============ MODELS ============
 class UserRegister(BaseModel):
     username: str
     email: str
@@ -94,47 +49,49 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
-class UserResponse(BaseModel):
-    id: str
-    username: str
-    email: str
-    avatar_url: Optional[str] = None
-    created_at: str
-
-class WatchlistItem(BaseModel):
-    anime_id: int
+class SeriesCreate(BaseModel):
     title: str
-    image_url: str
-    score: Optional[float] = None
-    episodes: Optional[int] = None
-    status: Optional[str] = None
+    description: str
+    genre: str
+    tags: List[str] = []
+    thumbnail_base64: Optional[str] = None
+    cover_base64: Optional[str] = None
 
-class WatchHistoryItem(BaseModel):
-    anime_id: int
+class EpisodeCreate(BaseModel):
+    series_id: str
+    title: str
+    description: Optional[str] = ""
     episode_number: int
-    title: str
-    anime_title: str
-    image_url: str
-    progress: float = 0.0
+    video_url: str
+    thumbnail_base64: Optional[str] = None
+    is_premium: bool = False
 
+class TipRequest(BaseModel):
+    creator_id: str
+    origin_url: str
 
-# ============ AUTH HELPERS ============
+class PremiumRequest(BaseModel):
+    origin_url: str
+
+class ChannelSubRequest(BaseModel):
+    creator_id: str
+    origin_url: str
+
+# Tip amounts (server-defined, not from frontend)
+TIP_AMOUNTS = {"small": 2.00, "medium": 5.00, "large": 10.00, "mega": 25.00}
+PREMIUM_PRICE = 4.99
+CHANNEL_SUB_PRICE = 2.99
+PLATFORM_CUT = 0.20  # 20%
+
+# ============ AUTH ============
 def create_token(user_id: str) -> str:
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
-        "iat": datetime.now(timezone.utc)
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
+    return jwt.encode({"user_id": user_id, "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS), "iat": datetime.now(timezone.utc)}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
@@ -150,293 +107,410 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+async def optional_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return await db.users.find_one({"id": payload["user_id"]}, {"_id": 0})
+    except:
+        return None
 
 # ============ AUTH ROUTES ============
 @api_router.post("/auth/register")
 async def register(data: UserRegister):
-    existing = await db.users.find_one({"email": data.email}, {"_id": 0})
-    if existing:
+    if await db.users.find_one({"email": data.email}, {"_id": 0}):
         raise HTTPException(status_code=400, detail="Email already registered")
-
-    existing_username = await db.users.find_one({"username": data.username}, {"_id": 0})
-    if existing_username:
+    if await db.users.find_one({"username": data.username}, {"_id": 0}):
         raise HTTPException(status_code=400, detail="Username already taken")
-
     user_id = str(uuid.uuid4())
     user_doc = {
-        "id": user_id,
-        "username": data.username,
-        "email": data.email,
-        "password_hash": hash_password(data.password),
-        "avatar_url": None,
+        "id": user_id, "username": data.username, "email": data.email,
+        "password_hash": hash_password(data.password), "avatar_color": "#00F0FF",
+        "bio": "", "is_creator": False, "is_premium": False,
+        "follower_count": 0, "following_count": 0,
+        "total_earnings": 0.0, "balance": 0.0,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(user_doc)
     token = create_token(user_id)
-    return {
-        "token": token,
-        "user": {
-            "id": user_id,
-            "username": data.username,
-            "email": data.email,
-            "avatar_url": None,
-            "created_at": user_doc["created_at"]
-        }
-    }
-
+    safe_user = {k: v for k, v in user_doc.items() if k not in ("password_hash", "_id")}
+    return {"token": token, "user": safe_user}
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
     user = await db.users.find_one({"email": data.email}, {"_id": 0})
     if not user or not verify_password(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-
     token = create_token(user["id"])
-    return {
-        "token": token,
-        "user": {
-            "id": user["id"],
-            "username": user["username"],
-            "email": user["email"],
-            "avatar_url": user.get("avatar_url"),
-            "created_at": user["created_at"]
-        }
-    }
-
+    safe_user = {k: v for k, v in user.items() if k not in ("password_hash", "_id")}
+    return {"token": token, "user": safe_user}
 
 @api_router.get("/auth/me")
 async def get_me(user=Depends(get_current_user)):
-    return {
-        "id": user["id"],
-        "username": user["username"],
-        "email": user["email"],
-        "avatar_url": user.get("avatar_url"),
-        "created_at": user["created_at"]
+    return {k: v for k, v in user.items() if k not in ("password_hash", "_id")}
+
+@api_router.put("/auth/become-creator")
+async def become_creator(user=Depends(get_current_user)):
+    await db.users.update_one({"id": user["id"]}, {"$set": {"is_creator": True}})
+    return {"message": "You are now a creator!"}
+
+# ============ SERIES ROUTES ============
+@api_router.post("/series")
+async def create_series(data: SeriesCreate, user=Depends(get_current_user)):
+    if not user.get("is_creator"):
+        raise HTTPException(status_code=403, detail="You must be a creator to upload")
+    series_id = str(uuid.uuid4())
+    series_doc = {
+        "id": series_id, "creator_id": user["id"], "creator_name": user["username"],
+        "creator_avatar_color": user.get("avatar_color", "#00F0FF"),
+        "title": data.title, "description": data.description,
+        "genre": data.genre, "tags": data.tags,
+        "thumbnail_base64": data.thumbnail_base64, "cover_base64": data.cover_base64,
+        "episode_count": 0, "view_count": 0, "like_count": 0,
+        "subscriber_count": 0, "is_featured": False,
+        "status": "ongoing", "created_at": datetime.now(timezone.utc).isoformat()
     }
+    await db.series.insert_one(series_doc)
+    series_doc.pop("_id", None)
+    return series_doc
 
+@api_router.get("/series")
+async def list_series(genre: Optional[str] = None, sort: str = "latest", page: int = 1, limit: int = 20):
+    query = {}
+    if genre and genre != "all":
+        query["genre"] = genre
+    sort_field = {"latest": ("created_at", -1), "popular": ("view_count", -1), "liked": ("like_count", -1)}.get(sort, ("created_at", -1))
+    skip = (page - 1) * limit
+    items = await db.series.find(query, {"_id": 0}).sort(*sort_field).skip(skip).limit(limit).to_list(limit)
+    total = await db.series.count_documents(query)
+    return {"data": items, "total": total, "page": page}
 
-# ============ ANIME ROUTES ============
-@api_router.get("/anime/search")
-async def search_anime(q: str = Query(..., min_length=1), page: int = Query(1, ge=1)):
-    result = await jikan_fetch("/anime", {"q": q, "page": page, "limit": 20, "sfw": "true"})
-    return result
+@api_router.get("/series/search")
+async def search_series(q: str = Query(..., min_length=1)):
+    items = await db.series.find({"title": {"$regex": q, "$options": "i"}}, {"_id": 0}).limit(20).to_list(20)
+    return {"data": items}
 
+@api_router.get("/series/{series_id}")
+async def get_series(series_id: str):
+    series = await db.series.find_one({"id": series_id}, {"_id": 0})
+    if not series:
+        raise HTTPException(status_code=404, detail="Series not found")
+    await db.series.update_one({"id": series_id}, {"$inc": {"view_count": 1}})
+    return series
 
-@api_router.get("/anime/top")
-async def get_top_anime(
-    filter: str = Query("airing", regex="^(airing|upcoming|bypopularity|favorite)$"),
-    page: int = Query(1, ge=1)
-):
-    result = await jikan_fetch("/top/anime", {"filter": filter, "page": page, "limit": 20, "sfw": "true"})
-    return result
+@api_router.get("/series/{series_id}/episodes")
+async def get_episodes(series_id: str):
+    episodes = await db.series_episodes.find({"series_id": series_id}, {"_id": 0}).sort("episode_number", 1).to_list(100)
+    return {"data": episodes}
 
+@api_router.delete("/series/{series_id}")
+async def delete_series(series_id: str, user=Depends(get_current_user)):
+    series = await db.series.find_one({"id": series_id, "creator_id": user["id"]}, {"_id": 0})
+    if not series:
+        raise HTTPException(status_code=404, detail="Series not found or not yours")
+    await db.series.delete_one({"id": series_id})
+    await db.series_episodes.delete_many({"series_id": series_id})
+    return {"message": "Series deleted"}
 
-@api_router.get("/anime/seasonal")
-async def get_seasonal_anime(
-    year: int = Query(2025),
-    season: str = Query("winter", regex="^(winter|spring|summer|fall)$"),
-    page: int = Query(1, ge=1)
-):
-    result = await jikan_fetch(f"/seasons/{year}/{season}", {"page": page, "limit": 20, "sfw": "true"})
-    return result
+# ============ EPISODE ROUTES ============
+@api_router.post("/episodes")
+async def create_episode(data: EpisodeCreate, user=Depends(get_current_user)):
+    series = await db.series.find_one({"id": data.series_id, "creator_id": user["id"]}, {"_id": 0})
+    if not series:
+        raise HTTPException(status_code=404, detail="Series not found or not yours")
+    ep_id = str(uuid.uuid4())
+    ep_doc = {
+        "id": ep_id, "series_id": data.series_id, "creator_id": user["id"],
+        "title": data.title, "description": data.description,
+        "episode_number": data.episode_number, "video_url": data.video_url,
+        "thumbnail_base64": data.thumbnail_base64 or series.get("thumbnail_base64"),
+        "is_premium": data.is_premium, "view_count": 0, "like_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.series_episodes.insert_one(ep_doc)
+    await db.series.update_one({"id": data.series_id}, {"$inc": {"episode_count": 1}})
+    ep_doc.pop("_id", None)
+    return ep_doc
 
+@api_router.delete("/episodes/{episode_id}")
+async def delete_episode(episode_id: str, user=Depends(get_current_user)):
+    ep = await db.series_episodes.find_one({"id": episode_id, "creator_id": user["id"]}, {"_id": 0})
+    if not ep:
+        raise HTTPException(status_code=404, detail="Episode not found or not yours")
+    await db.series_episodes.delete_one({"id": episode_id})
+    await db.series.update_one({"id": ep["series_id"]}, {"$inc": {"episode_count": -1}})
+    return {"message": "Episode deleted"}
 
-@api_router.get("/anime/genres")
-async def get_genres():
-    result = await jikan_fetch("/genres/anime")
-    return result
+# ============ CREATOR PROFILE ============
+@api_router.get("/creators/{user_id}")
+async def get_creator_profile(user_id: str):
+    creator = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not creator:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    series_list = await db.series.find({"creator_id": user_id}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return {"creator": creator, "series": series_list}
 
+@api_router.put("/profile/update")
+async def update_profile(bio: str = "", avatar_color: str = "#00F0FF", user=Depends(get_current_user)):
+    await db.users.update_one({"id": user["id"]}, {"$set": {"bio": bio, "avatar_color": avatar_color}})
+    return {"message": "Profile updated"}
 
-@api_router.get("/anime/{anime_id}")
-async def get_anime_detail(anime_id: int):
-    result = await jikan_fetch(f"/anime/{anime_id}/full")
-    return result
+# ============ FOLLOW SYSTEM ============
+@api_router.post("/follow/{creator_id}")
+async def follow_creator(creator_id: str, user=Depends(get_current_user)):
+    if creator_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot follow yourself")
+    existing = await db.follows.find_one({"follower_id": user["id"], "following_id": creator_id}, {"_id": 0})
+    if existing:
+        raise HTTPException(status_code=400, detail="Already following")
+    await db.follows.insert_one({"follower_id": user["id"], "following_id": creator_id, "created_at": datetime.now(timezone.utc).isoformat()})
+    await db.users.update_one({"id": creator_id}, {"$inc": {"follower_count": 1}})
+    await db.users.update_one({"id": user["id"]}, {"$inc": {"following_count": 1}})
+    return {"message": "Followed"}
 
+@api_router.delete("/follow/{creator_id}")
+async def unfollow_creator(creator_id: str, user=Depends(get_current_user)):
+    result = await db.follows.delete_one({"follower_id": user["id"], "following_id": creator_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not following")
+    await db.users.update_one({"id": creator_id}, {"$inc": {"follower_count": -1}})
+    await db.users.update_one({"id": user["id"]}, {"$inc": {"following_count": -1}})
+    return {"message": "Unfollowed"}
 
-@api_router.get("/anime/{anime_id}/episodes")
-async def get_anime_episodes(anime_id: int, page: int = Query(1, ge=1)):
-    result = await jikan_fetch(f"/anime/{anime_id}/episodes", {"page": page})
-    return result
+@api_router.get("/follow/check/{creator_id}")
+async def check_follow(creator_id: str, user=Depends(get_current_user)):
+    existing = await db.follows.find_one({"follower_id": user["id"], "following_id": creator_id}, {"_id": 0})
+    return {"is_following": existing is not None}
 
-
-@api_router.get("/anime/{anime_id}/recommendations")
-async def get_anime_recommendations(anime_id: int):
-    result = await jikan_fetch(f"/anime/{anime_id}/recommendations")
-    return result
-
-
-# ============ WATCHLIST ROUTES ============
+# ============ WATCHLIST ============
 @api_router.get("/watchlist")
 async def get_watchlist(user=Depends(get_current_user)):
-    items = await db.watchlist.find(
-        {"user_id": user["id"]}, {"_id": 0}
-    ).to_list(100)
+    items = await db.watchlist.find({"user_id": user["id"]}, {"_id": 0}).to_list(100)
     return {"items": items}
 
-
-@api_router.post("/watchlist")
-async def add_to_watchlist(item: WatchlistItem, user=Depends(get_current_user)):
-    existing = await db.watchlist.find_one(
-        {"user_id": user["id"], "anime_id": item.anime_id}, {"_id": 0}
-    )
+@api_router.post("/watchlist/{series_id}")
+async def add_to_watchlist(series_id: str, user=Depends(get_current_user)):
+    existing = await db.watchlist.find_one({"user_id": user["id"], "series_id": series_id}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Already in watchlist")
-
-    doc = {
-        "id": str(uuid.uuid4()),
-        "user_id": user["id"],
-        "anime_id": item.anime_id,
-        "title": item.title,
-        "image_url": item.image_url,
-        "score": item.score,
-        "episodes": item.episodes,
-        "status": item.status,
-        "added_at": datetime.now(timezone.utc).isoformat()
-    }
+    series = await db.series.find_one({"id": series_id}, {"_id": 0})
+    if not series:
+        raise HTTPException(status_code=404, detail="Series not found")
+    doc = {"user_id": user["id"], "series_id": series_id, "title": series["title"], "thumbnail_base64": series.get("thumbnail_base64"), "genre": series.get("genre"), "added_at": datetime.now(timezone.utc).isoformat()}
     await db.watchlist.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
+    return {"message": "Added to watchlist"}
 
-
-@api_router.delete("/watchlist/{anime_id}")
-async def remove_from_watchlist(anime_id: int, user=Depends(get_current_user)):
-    result = await db.watchlist.delete_one({"user_id": user["id"], "anime_id": anime_id})
+@api_router.delete("/watchlist/{series_id}")
+async def remove_from_watchlist(series_id: str, user=Depends(get_current_user)):
+    result = await db.watchlist.delete_one({"user_id": user["id"], "series_id": series_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Not in watchlist")
     return {"message": "Removed from watchlist"}
 
+# ============ LIKES ============
+@api_router.post("/like/series/{series_id}")
+async def like_series(series_id: str, user=Depends(get_current_user)):
+    existing = await db.likes.find_one({"user_id": user["id"], "series_id": series_id}, {"_id": 0})
+    if existing:
+        await db.likes.delete_one({"user_id": user["id"], "series_id": series_id})
+        await db.series.update_one({"id": series_id}, {"$inc": {"like_count": -1}})
+        return {"liked": False}
+    await db.likes.insert_one({"user_id": user["id"], "series_id": series_id, "created_at": datetime.now(timezone.utc).isoformat()})
+    await db.series.update_one({"id": series_id}, {"$inc": {"like_count": 1}})
+    return {"liked": True}
 
-@api_router.get("/watchlist/check/{anime_id}")
-async def check_watchlist(anime_id: int, user=Depends(get_current_user)):
-    item = await db.watchlist.find_one(
-        {"user_id": user["id"], "anime_id": anime_id}, {"_id": 0}
-    )
-    return {"in_watchlist": item is not None}
+@api_router.get("/like/check/{series_id}")
+async def check_like(series_id: str, user=Depends(get_current_user)):
+    existing = await db.likes.find_one({"user_id": user["id"], "series_id": series_id}, {"_id": 0})
+    return {"liked": existing is not None}
 
+# ============ PAYMENTS (STRIPE) ============
+@api_router.post("/payments/tip")
+async def create_tip(tip_size: str, creator_id: str, origin_url: str, user=Depends(get_current_user)):
+    if tip_size not in TIP_AMOUNTS:
+        raise HTTPException(status_code=400, detail="Invalid tip size")
+    amount = TIP_AMOUNTS[tip_size]
+    creator = await db.users.find_one({"id": creator_id}, {"_id": 0})
+    if not creator:
+        raise HTTPException(status_code=404, detail="Creator not found")
 
-# ============ WATCH HISTORY ROUTES ============
-@api_router.post("/history")
-async def update_watch_history(item: WatchHistoryItem, user=Depends(get_current_user)):
-    doc = {
-        "user_id": user["id"],
-        "anime_id": item.anime_id,
-        "episode_number": item.episode_number,
-        "title": item.title,
-        "anime_title": item.anime_title,
-        "image_url": item.image_url,
-        "progress": item.progress,
-        "watched_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.watch_history.update_one(
-        {"user_id": user["id"], "anime_id": item.anime_id, "episode_number": item.episode_number},
-        {"$set": doc},
-        upsert=True
-    )
-    return {"message": "History updated"}
+    webhook_url = f"{origin_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    success_url = f"{origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin_url}/payment-cancel"
+    metadata = {"type": "tip", "tipper_id": user["id"], "creator_id": creator_id, "tip_size": tip_size}
+    req = CheckoutSessionRequest(amount=amount, currency="usd", success_url=success_url, cancel_url=cancel_url, metadata=metadata)
+    session = await stripe_checkout.create_checkout_session(req)
+    await db.payment_transactions.insert_one({
+        "session_id": session.session_id, "user_id": user["id"], "creator_id": creator_id,
+        "type": "tip", "amount": amount, "currency": "usd", "metadata": metadata,
+        "payment_status": "pending", "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"url": session.url, "session_id": session.session_id}
 
+@api_router.post("/payments/premium")
+async def create_premium_sub(origin_url: str, user=Depends(get_current_user)):
+    webhook_url = f"{origin_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    success_url = f"{origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin_url}/payment-cancel"
+    metadata = {"type": "premium", "user_id": user["id"]}
+    req = CheckoutSessionRequest(amount=PREMIUM_PRICE, currency="usd", success_url=success_url, cancel_url=cancel_url, metadata=metadata)
+    session = await stripe_checkout.create_checkout_session(req)
+    await db.payment_transactions.insert_one({
+        "session_id": session.session_id, "user_id": user["id"],
+        "type": "premium", "amount": PREMIUM_PRICE, "currency": "usd", "metadata": metadata,
+        "payment_status": "pending", "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"url": session.url, "session_id": session.session_id}
 
-@api_router.get("/history")
-async def get_watch_history(user=Depends(get_current_user)):
-    items = await db.watch_history.find(
-        {"user_id": user["id"]}, {"_id": 0}
-    ).sort("watched_at", -1).to_list(50)
-    return {"items": items}
+@api_router.post("/payments/channel-sub")
+async def create_channel_sub(creator_id: str, origin_url: str, user=Depends(get_current_user)):
+    creator = await db.users.find_one({"id": creator_id}, {"_id": 0})
+    if not creator:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    webhook_url = f"{origin_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    success_url = f"{origin_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin_url}/payment-cancel"
+    metadata = {"type": "channel_sub", "subscriber_id": user["id"], "creator_id": creator_id}
+    req = CheckoutSessionRequest(amount=CHANNEL_SUB_PRICE, currency="usd", success_url=success_url, cancel_url=cancel_url, metadata=metadata)
+    session = await stripe_checkout.create_checkout_session(req)
+    await db.payment_transactions.insert_one({
+        "session_id": session.session_id, "user_id": user["id"], "creator_id": creator_id,
+        "type": "channel_sub", "amount": CHANNEL_SUB_PRICE, "currency": "usd", "metadata": metadata,
+        "payment_status": "pending", "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    return {"url": session.url, "session_id": session.session_id}
 
+@api_router.get("/payments/status/{session_id}")
+async def get_payment_status(session_id: str, request: Request):
+    tx = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if tx["payment_status"] in ("paid", "completed"):
+        return tx
+    host_url = str(request.base_url).rstrip("/")
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    status = await stripe_checkout.get_checkout_status(session_id)
+    if status.payment_status == "paid" and tx["payment_status"] != "paid":
+        await db.payment_transactions.update_one({"session_id": session_id}, {"$set": {"payment_status": "paid", "status": status.status}})
+        if tx["type"] == "tip":
+            creator_share = tx["amount"] * (1 - PLATFORM_CUT)
+            await db.users.update_one({"id": tx["creator_id"]}, {"$inc": {"total_earnings": creator_share, "balance": creator_share}})
+        elif tx["type"] == "premium":
+            await db.users.update_one({"id": tx["user_id"]}, {"$set": {"is_premium": True}})
+        elif tx["type"] == "channel_sub":
+            creator_share = tx["amount"] * (1 - PLATFORM_CUT)
+            await db.users.update_one({"id": tx["creator_id"]}, {"$inc": {"total_earnings": creator_share, "balance": creator_share, "subscriber_count": 1}})
+    updated_tx = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    return updated_tx
 
-class ProfileCreate(BaseModel):
-    name: str
-    avatar_color: Optional[str] = None
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    body = await request.body()
+    sig = request.headers.get("Stripe-Signature", "")
+    host_url = str(request.base_url).rstrip("/")
+    webhook_url = f"{host_url}/api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+    try:
+        event = await stripe_checkout.handle_webhook(body, sig)
+        if event.payment_status == "paid":
+            tx = await db.payment_transactions.find_one({"session_id": event.session_id}, {"_id": 0})
+            if tx and tx["payment_status"] != "paid":
+                await db.payment_transactions.update_one({"session_id": event.session_id}, {"$set": {"payment_status": "paid"}})
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return {"status": "error"}
 
+# ============ GENRES ============
+GENRES = ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "Horror", "Romance", "Sci-Fi", "Slice of Life", "Sports", "Supernatural", "Mystery", "Mecha", "Isekai", "Thriller"]
 
-# ============ PROFILES ROUTES ============
-@api_router.get("/profiles")
-async def get_profiles(user=Depends(get_current_user)):
-    profiles = await db.profiles.find({"user_id": user["id"]}, {"_id": 0}).to_list(5)
-    if not profiles:
-        default_profile = {
-            "id": str(uuid.uuid4()),
-            "user_id": user["id"],
-            "name": user["username"],
-            "avatar_color": "#00F0FF",
-            "is_active": True,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.profiles.insert_one(default_profile)
-        default_profile.pop("_id", None)
-        profiles = [default_profile]
-    return {"profiles": profiles}
+@api_router.get("/genres")
+async def get_genres():
+    return {"genres": GENRES}
 
+# ============ FEED ============
+@api_router.get("/feed/featured")
+async def get_featured():
+    items = await db.series.find({}, {"_id": 0}).sort("like_count", -1).limit(5).to_list(5)
+    return {"data": items}
 
-@api_router.post("/profiles")
-async def create_profile(data: ProfileCreate, user=Depends(get_current_user)):
-    count = await db.profiles.count_documents({"user_id": user["id"]})
-    if count >= 5:
-        raise HTTPException(status_code=400, detail="Maximum 5 profiles allowed")
-    profile = {
-        "id": str(uuid.uuid4()),
-        "user_id": user["id"],
-        "name": data.name,
-        "avatar_color": data.avatar_color or "#FF0099",
-        "is_active": False,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.profiles.insert_one(profile)
-    profile.pop("_id", None)
-    return profile
+@api_router.get("/feed/trending")
+async def get_trending():
+    items = await db.series.find({}, {"_id": 0}).sort("view_count", -1).limit(20).to_list(20)
+    return {"data": items}
 
+@api_router.get("/feed/latest")
+async def get_latest():
+    items = await db.series.find({}, {"_id": 0}).sort("created_at", -1).limit(20).to_list(20)
+    return {"data": items}
 
-@api_router.put("/profiles/{profile_id}/switch")
-async def switch_profile(profile_id: str, user=Depends(get_current_user)):
-    profile = await db.profiles.find_one({"id": profile_id, "user_id": user["id"]}, {"_id": 0})
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    await db.profiles.update_many({"user_id": user["id"]}, {"$set": {"is_active": False}})
-    await db.profiles.update_one({"id": profile_id}, {"$set": {"is_active": True}})
-    return {"message": "Switched to profile", "profile": {**profile, "is_active": True}}
+@api_router.get("/feed/top-creators")
+async def get_top_creators():
+    creators = await db.users.find({"is_creator": True}, {"_id": 0, "password_hash": 0}).sort("follower_count", -1).limit(10).to_list(10)
+    return {"data": creators}
 
+# ============ MY CONTENT (Creator Studio) ============
+@api_router.get("/my/series")
+async def my_series(user=Depends(get_current_user)):
+    items = await db.series.find({"creator_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return {"data": items}
 
-@api_router.delete("/profiles/{profile_id}")
-async def delete_profile(profile_id: str, user=Depends(get_current_user)):
-    count = await db.profiles.count_documents({"user_id": user["id"]})
-    if count <= 1:
-        raise HTTPException(status_code=400, detail="Cannot delete the only profile")
-    result = await db.profiles.delete_one({"id": profile_id, "user_id": user["id"]})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    active = await db.profiles.find_one({"user_id": user["id"], "is_active": True}, {"_id": 0})
-    if not active:
-        first = await db.profiles.find_one({"user_id": user["id"]}, {"_id": 0})
-        if first:
-            await db.profiles.update_one({"id": first["id"]}, {"$set": {"is_active": True}})
-    return {"message": "Profile deleted"}
+@api_router.get("/my/earnings")
+async def my_earnings(user=Depends(get_current_user)):
+    transactions = await db.payment_transactions.find({"creator_id": user["id"], "payment_status": "paid"}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"transactions": transactions, "total_earnings": user.get("total_earnings", 0), "balance": user.get("balance", 0)}
 
+# ============ SEED DATA ============
+@api_router.post("/seed")
+async def seed_data():
+    existing = await db.series.count_documents({})
+    if existing > 0:
+        return {"message": "Data already seeded"}
+
+    # Create demo creators
+    creators = [
+        {"id": str(uuid.uuid4()), "username": "SakuraStudio", "email": "sakura@demo.com", "password_hash": hash_password("demo123"), "avatar_color": "#FF0099", "bio": "Independent anime studio creating original stories", "is_creator": True, "is_premium": False, "follower_count": 1240, "following_count": 5, "total_earnings": 0.0, "balance": 0.0, "created_at": datetime.now(timezone.utc).isoformat()},
+        {"id": str(uuid.uuid4()), "username": "NeonDreams", "email": "neon@demo.com", "password_hash": hash_password("demo123"), "avatar_color": "#00F0FF", "bio": "Cyberpunk anime creator | New episodes every week", "is_creator": True, "is_premium": False, "follower_count": 890, "following_count": 12, "total_earnings": 0.0, "balance": 0.0, "created_at": datetime.now(timezone.utc).isoformat()},
+        {"id": str(uuid.uuid4()), "username": "MoonlitArts", "email": "moonlit@demo.com", "password_hash": hash_password("demo123"), "avatar_color": "#7000FF", "bio": "Fantasy & romance anime | Dreaming in color", "is_creator": True, "is_premium": False, "follower_count": 2100, "following_count": 8, "total_earnings": 0.0, "balance": 0.0, "created_at": datetime.now(timezone.utc).isoformat()},
+        {"id": str(uuid.uuid4()), "username": "ThunderAnime", "email": "thunder@demo.com", "password_hash": hash_password("demo123"), "avatar_color": "#FFD600", "bio": "Action-packed original anime | Fight scenes specialist", "is_creator": True, "is_premium": False, "follower_count": 3400, "following_count": 3, "total_earnings": 0.0, "balance": 0.0, "created_at": datetime.now(timezone.utc).isoformat()},
+    ]
+    for c in creators:
+        await db.users.update_one({"email": c["email"]}, {"$set": c}, upsert=True)
+
+    # Create demo series
+    demo_series = [
+        {"id": str(uuid.uuid4()), "creator_id": creators[0]["id"], "creator_name": "SakuraStudio", "creator_avatar_color": "#FF0099", "title": "Crimson Petals", "description": "A young warrior discovers she holds the power of the ancient sakura spirits. As dark forces threaten her village, she must master her abilities before it's too late.", "genre": "Fantasy", "tags": ["fantasy", "action", "magic"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 6, "view_count": 15600, "like_count": 890, "subscriber_count": 340, "is_featured": True, "status": "ongoing", "created_at": "2026-01-15T10:00:00+00:00"},
+        {"id": str(uuid.uuid4()), "creator_id": creators[1]["id"], "creator_name": "NeonDreams", "creator_avatar_color": "#00F0FF", "title": "Circuit Zero", "description": "In Neo-Tokyo 2099, a hacker discovers a conspiracy that could destroy the boundary between the digital and physical worlds. Jack in or log out forever.", "genre": "Sci-Fi", "tags": ["cyberpunk", "sci-fi", "thriller"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 4, "view_count": 12300, "like_count": 720, "subscriber_count": 210, "is_featured": True, "status": "ongoing", "created_at": "2026-02-01T10:00:00+00:00"},
+        {"id": str(uuid.uuid4()), "creator_id": creators[2]["id"], "creator_name": "MoonlitArts", "creator_avatar_color": "#7000FF", "title": "Starlight Academy", "description": "At a prestigious academy for gifted artists, two rivals discover that their magical paintings can bring worlds to life. But some creations should never exist.", "genre": "Romance", "tags": ["romance", "school", "magic"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 8, "view_count": 23400, "like_count": 1850, "subscriber_count": 670, "is_featured": True, "status": "ongoing", "created_at": "2025-12-20T10:00:00+00:00"},
+        {"id": str(uuid.uuid4()), "creator_id": creators[3]["id"], "creator_name": "ThunderAnime", "creator_avatar_color": "#FFD600", "title": "Iron Fist Legacy", "description": "The last martial arts master must train a new generation of fighters to defend Earth from interdimensional warriors. The tournament begins now.", "genre": "Action", "tags": ["action", "martial-arts", "tournament"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 12, "view_count": 45200, "like_count": 3200, "subscriber_count": 1100, "is_featured": True, "status": "ongoing", "created_at": "2025-11-10T10:00:00+00:00"},
+        {"id": str(uuid.uuid4()), "creator_id": creators[0]["id"], "creator_name": "SakuraStudio", "creator_avatar_color": "#FF0099", "title": "Whispers in the Rain", "description": "A gentle slice of life story about a cafe owner who can hear the stories of anyone who enters during rainfall.", "genre": "Slice of Life", "tags": ["slice-of-life", "drama", "cozy"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 3, "view_count": 8900, "like_count": 560, "subscriber_count": 180, "is_featured": False, "status": "ongoing", "created_at": "2026-03-01T10:00:00+00:00"},
+        {"id": str(uuid.uuid4()), "creator_id": creators[1]["id"], "creator_name": "NeonDreams", "creator_avatar_color": "#00F0FF", "title": "Ghost Protocol", "description": "Elite cyber-agents hunt digital ghosts that have escaped into the real world. Each ghost carries a fragment of a forbidden AI.", "genre": "Thriller", "tags": ["thriller", "cyber", "mystery"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 5, "view_count": 9700, "like_count": 410, "subscriber_count": 150, "is_featured": False, "status": "ongoing", "created_at": "2026-02-20T10:00:00+00:00"},
+    ]
+    for s in demo_series:
+        await db.series.insert_one(s)
+
+    return {"message": "Seeded successfully", "creators": len(creators), "series": len(demo_series)}
 
 # ============ HEALTH ============
 @api_router.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "anime-world-api"}
 
-
-# Include router and middleware
 app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
 
-# Serve built Expo web frontend (for Railway/production deployment)
 FRONTEND_DIST = ROOT_DIR.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIST)), name="static")
-
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         file_path = FRONTEND_DIST / full_path

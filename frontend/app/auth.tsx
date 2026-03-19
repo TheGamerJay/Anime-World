@@ -1,45 +1,56 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, Stack } from 'expo-router';
 import { Colors, Spacing, Radius } from '../src/theme';
 import { useAuth } from '../src/AuthContext';
 
 export default function AuthScreen() {
   const router = useRouter();
   const { login, register } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (mode === 'register') {
+      if (!username.trim()) {
+        Alert.alert('Error', 'Please enter a username');
+        return;
+      }
+      if (password !== confirmPassword) {
+        Alert.alert('Error', 'Passwords do not match');
+        return;
+      }
+    }
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email');
       return;
     }
-    if (!isLogin && !username.trim()) {
-      Alert.alert('Error', 'Please enter a username');
+    if (!password) {
+      Alert.alert('Error', 'Please enter your password');
       return;
     }
 
     setLoading(true);
     try {
-      if (isLogin) {
-        await login(email.trim(), password);
+      if (mode === 'login') {
+        await login(email, password);
       } else {
-        await register(username.trim(), email.trim(), password);
+        await register(username, email, password);
       }
-      router.back();
+      router.replace('/');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Something went wrong');
+      Alert.alert('Error', err.message || 'Authentication failed');
     } finally {
       setLoading(false);
     }
@@ -47,31 +58,46 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
+      <Stack.Screen options={{ headerShown: false }} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Close button */}
-          <TouchableOpacity testID="auth-close-btn" onPress={() => router.back()} style={styles.closeBtn}>
-            <Ionicons name="close" size={28} color={Colors.text.primary} />
-          </TouchableOpacity>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+            </TouchableOpacity>
+          </View>
 
           {/* Logo */}
           <View style={styles.logoSection}>
             <Text style={styles.logo}>ANIME<Text style={styles.logoPink}>WORLD</Text></Text>
-            <Text style={styles.subtitle}>{isLogin ? 'Welcome back!' : 'Create your account'}</Text>
+            <Text style={styles.tagline}>Original Anime by Creators</Text>
+          </View>
+
+          {/* Mode Toggle */}
+          <View style={styles.modeToggle}>
+            <TouchableOpacity
+              onPress={() => setMode('login')}
+              style={[styles.modeBtn, mode === 'login' && styles.modeBtnActive]}
+            >
+              <Text style={[styles.modeBtnText, mode === 'login' && styles.modeBtnTextActive]}>Sign In</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setMode('register')}
+              style={[styles.modeBtn, mode === 'register' && styles.modeBtnActive]}
+            >
+              <Text style={[styles.modeBtnText, mode === 'register' && styles.modeBtnTextActive]}>Create Account</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            {!isLogin && (
+            {mode === 'register' && (
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>USERNAME</Text>
-                <View style={styles.inputWrapper}>
+                <Text style={styles.label}>Username</Text>
+                <View style={styles.inputContainer}>
                   <Ionicons name="person-outline" size={20} color={Colors.text.muted} />
                   <TextInput
-                    testID="auth-username-input"
                     style={styles.input}
                     placeholder="Choose a username"
                     placeholderTextColor={Colors.text.muted}
@@ -84,13 +110,12 @@ export default function AuthScreen() {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>EMAIL</Text>
-              <View style={styles.inputWrapper}>
+              <Text style={styles.label}>Email</Text>
+              <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color={Colors.text.muted} />
                 <TextInput
-                  testID="auth-email-input"
                   style={styles.input}
-                  placeholder="your@email.com"
+                  placeholder="Enter your email"
                   placeholderTextColor={Colors.text.muted}
                   value={email}
                   onChangeText={setEmail}
@@ -101,46 +126,58 @@ export default function AuthScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>PASSWORD</Text>
-              <View style={styles.inputWrapper}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.inputContainer}>
                 <Ionicons name="lock-closed-outline" size={20} color={Colors.text.muted} />
                 <TextInput
-                  testID="auth-password-input"
                   style={styles.input}
-                  placeholder="Enter password"
+                  placeholder="Enter your password"
                   placeholderTextColor={Colors.text.muted}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.emojiBtn}>
-                  <Text style={styles.monkeyEmoji}>{showPassword ? '\u{1F648}' : '\u{1F649}'}</Text>
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.text.muted} />
                 </TouchableOpacity>
               </View>
             </View>
 
+            {mode === 'register' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <View style={styles.inputContainer}>
+                  <Ionicons name="lock-closed-outline" size={20} color={Colors.text.muted} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirm your password"
+                    placeholderTextColor={Colors.text.muted}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                </View>
+              </View>
+            )}
+
             {/* Submit Button */}
-            <TouchableOpacity testID="auth-submit-btn" onPress={handleSubmit} disabled={loading} style={styles.submitBtn}>
-              <LinearGradient
-                colors={[Colors.brand.cyan, Colors.brand.pink]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.submitGradient}
-              >
+            <TouchableOpacity onPress={handleSubmit} disabled={loading} style={styles.submitBtn}>
+              <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.submitGradient}>
                 {loading ? (
                   <ActivityIndicator size="small" color="#000" />
                 ) : (
-                  <Text style={styles.submitText}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+                  <Text style={styles.submitText}>{mode === 'login' ? 'Sign In' : 'Create Account'}</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Toggle */}
-            <TouchableOpacity testID="auth-toggle-btn" onPress={() => setIsLogin(!isLogin)} style={styles.toggleBtn}>
-              <Text style={styles.toggleText}>
-                {isLogin ? "Don't have an account? " : 'Already have an account? '}
-                <Text style={styles.toggleTextHighlight}>{isLogin ? 'Sign Up' : 'Sign In'}</Text>
+            {/* Footer */}
+            <Text style={styles.footerText}>
+              {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+              <Text onPress={() => setMode(mode === 'login' ? 'register' : 'login')} style={styles.footerLink}>
+                {mode === 'login' ? 'Create one' : 'Sign in'}
               </Text>
-            </TouchableOpacity>
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -150,28 +187,32 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.default },
-  keyboardView: { flex: 1 },
-  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.lg },
-  closeBtn: { alignSelf: 'flex-end', padding: 8, marginTop: 8 },
-  logoSection: { alignItems: 'center', marginTop: 40, marginBottom: 40 },
-  logo: { fontSize: 36, fontWeight: '800', color: Colors.brand.cyan, letterSpacing: 3 },
+  scrollContent: { flexGrow: 1, padding: Spacing.md },
+  header: { marginBottom: Spacing.lg },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  logoSection: { alignItems: 'center', marginBottom: Spacing.xl },
+  logo: { fontSize: 36, fontWeight: '800', color: Colors.brand.cyan, letterSpacing: 2 },
   logoPink: { color: Colors.brand.pink },
-  subtitle: { fontSize: 16, color: Colors.text.secondary, marginTop: 8 },
-  form: { gap: 20 },
-  inputGroup: { gap: 8 },
-  inputLabel: { fontSize: 12, fontWeight: '600', color: Colors.text.muted, letterSpacing: 1.5 },
-  inputWrapper: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bg.card,
-    borderRadius: Radius.md, paddingLeft: Spacing.md, paddingRight: 4, height: 52,
-    borderWidth: 1, borderColor: Colors.border, gap: 10, overflow: 'hidden',
+  tagline: { color: Colors.text.muted, fontSize: 14, marginTop: 8 },
+  modeToggle: {
+    flexDirection: 'row', backgroundColor: Colors.bg.surface, borderRadius: Radius.md,
+    padding: 4, marginBottom: Spacing.lg,
   },
-  input: { flex: 1, color: Colors.text.primary, fontSize: 16 },
-  emojiBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  submitBtn: { borderRadius: Radius.full, overflow: 'hidden', marginTop: 8 },
-  submitGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-  submitText: { color: '#000', fontWeight: '700', fontSize: 17 },
-  toggleBtn: { alignItems: 'center', paddingVertical: 16 },
-  toggleText: { fontSize: 14, color: Colors.text.secondary },
-  toggleTextHighlight: { color: Colors.brand.cyan, fontWeight: '600' },
-  monkeyEmoji: { fontSize: 20, textAlign: 'center' },
+  modeBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: Radius.sm },
+  modeBtnActive: { backgroundColor: Colors.bg.card },
+  modeBtnText: { color: Colors.text.muted, fontWeight: '600', fontSize: 14 },
+  modeBtnTextActive: { color: Colors.text.primary },
+  form: { flex: 1 },
+  inputGroup: { marginBottom: Spacing.md },
+  label: { fontSize: 14, fontWeight: '600', color: Colors.text.secondary, marginBottom: 8 },
+  inputContainer: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bg.surface,
+    borderRadius: Radius.md, paddingHorizontal: 16, borderWidth: 1, borderColor: Colors.border,
+  },
+  input: { flex: 1, paddingVertical: 14, fontSize: 16, color: Colors.text.primary, marginLeft: 10 },
+  submitBtn: { marginTop: Spacing.lg, borderRadius: Radius.full, overflow: 'hidden' },
+  submitGradient: { paddingVertical: 16, alignItems: 'center' },
+  submitText: { color: '#000', fontWeight: '700', fontSize: 16 },
+  footerText: { textAlign: 'center', marginTop: Spacing.lg, color: Colors.text.muted, fontSize: 14 },
+  footerLink: { color: Colors.brand.cyan, fontWeight: '600' },
 });

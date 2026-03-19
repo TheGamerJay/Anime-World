@@ -8,24 +8,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '../../src/theme';
 import { useAuth } from '../../src/AuthContext';
-import { profilesAPI } from '../../src/api';
+
+function formatMoney(amount: number): string {
+  return '$' + amount.toFixed(2);
+}
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, loading: authLoading } = useAuth();
-  const [activeProfile, setActiveProfile] = useState<any>(null);
-
-  useEffect(() => {
-    if (user) loadActiveProfile();
-  }, [user]);
-
-  async function loadActiveProfile() {
-    try {
-      const res = await profilesAPI.getAll();
-      const active = (res.profiles || []).find((p: any) => p.is_active);
-      setActiveProfile(active || null);
-    } catch {}
-  }
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -59,7 +49,7 @@ export default function ProfileScreen() {
               <Ionicons name="person" size={48} color={Colors.text.muted} />
             </View>
             <Text style={styles.emptyTitle}>Join Anime World</Text>
-            <Text style={styles.emptySubtext}>Sign in to track your progress, save favorites, and more</Text>
+            <Text style={styles.emptySubtext}>Sign in to track your progress, save favorites, and become a creator</Text>
             <TouchableOpacity testID="profile-login-btn" onPress={() => router.push('/auth')} style={styles.signInBtn}>
               <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signInGradient}>
                 <Text style={styles.signInText}>Sign In</Text>
@@ -85,9 +75,8 @@ export default function ProfileScreen() {
     );
   }
 
-  const profileColor = activeProfile?.avatar_color || Colors.brand.cyan;
-  const profileName = activeProfile?.name || user.username;
-  const initial = profileName.charAt(0).toUpperCase();
+  const profileColor = user.avatar_color || Colors.brand.cyan;
+  const initial = user.username.charAt(0).toUpperCase();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -98,20 +87,57 @@ export default function ProfileScreen() {
 
         {/* Avatar + Info */}
         <View style={styles.profileSection}>
-          <TouchableOpacity testID="switch-profile-link" onPress={() => router.push('/switch-profile')} activeOpacity={0.8}>
-            <LinearGradient colors={[profileColor, profileColor + '80']} style={styles.avatarGradient}>
-              <View style={styles.avatarInner}>
-                <Text style={[styles.avatarLetter, { color: profileColor }]}>{initial}</Text>
+          <LinearGradient colors={[profileColor, profileColor + '60']} style={styles.avatarGradient}>
+            <View style={styles.avatarInner}>
+              <Text style={[styles.avatarLetter, { color: profileColor }]}>{initial}</Text>
+            </View>
+          </LinearGradient>
+          <View style={styles.nameRow}>
+            <Text style={styles.username}>{user.username}</Text>
+            {user.is_creator && (
+              <View style={styles.creatorBadge}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.brand.success} />
+                <Text style={styles.creatorBadgeText}>Creator</Text>
               </View>
-            </LinearGradient>
-          </TouchableOpacity>
-          <Text style={styles.username}>{profileName}</Text>
+            )}
+          </View>
           <Text style={styles.email}>{user.email}</Text>
-          <TouchableOpacity testID="switch-profile-btn" onPress={() => router.push('/switch-profile')} style={styles.switchProfileBtn}>
-            <Ionicons name="swap-horizontal" size={16} color={Colors.brand.cyan} />
-            <Text style={styles.switchProfileText}>Switch Profile</Text>
-          </TouchableOpacity>
+          
+          {/* Stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{user.follower_count}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{user.following_count}</Text>
+              <Text style={styles.statLabel}>Following</Text>
+            </View>
+            {user.is_creator && (
+              <>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: Colors.brand.success }]}>{formatMoney(user.balance)}</Text>
+                  <Text style={styles.statLabel}>Balance</Text>
+                </View>
+              </>
+            )}
+          </View>
         </View>
+
+        {/* Premium Card */}
+        {!user.is_premium && (
+          <TouchableOpacity onPress={() => {}} style={styles.premiumCard}>
+            <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+            <Ionicons name="star" size={24} color="#000" />
+            <View style={styles.premiumTextContainer}>
+              <Text style={styles.premiumTitle}>Go Premium</Text>
+              <Text style={styles.premiumSubtext}>Ad-free viewing & exclusive content</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#000" />
+          </TouchableOpacity>
+        )}
 
         {/* App Menu */}
         <View style={styles.menuSection}>
@@ -181,10 +207,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   avatarLetter: { fontSize: 32, fontWeight: '800' },
-  username: { fontSize: 22, fontWeight: '700', color: Colors.text.primary, marginTop: Spacing.md },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: Spacing.md },
+  username: { fontSize: 22, fontWeight: '700', color: Colors.text.primary },
+  creatorBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.brand.success + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
+  creatorBadgeText: { color: Colors.brand.success, fontSize: 11, fontWeight: '700' },
   email: { fontSize: 14, color: Colors.text.muted, marginTop: 4 },
-  switchProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.brand.cyanDim },
-  switchProfileText: { fontSize: 13, color: Colors.brand.cyan, fontWeight: '600' },
+  statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md, backgroundColor: Colors.bg.surface, borderRadius: Radius.md, padding: Spacing.md },
+  statItem: { alignItems: 'center', paddingHorizontal: 16 },
+  statValue: { fontSize: 18, fontWeight: '800', color: Colors.text.primary },
+  statLabel: { fontSize: 11, color: Colors.text.muted, marginTop: 2 },
+  statDivider: { width: 1, height: 30, backgroundColor: Colors.border },
+  premiumCard: {
+    flexDirection: 'row', alignItems: 'center', marginHorizontal: Spacing.md, marginTop: Spacing.md,
+    padding: Spacing.md, borderRadius: Radius.md, overflow: 'hidden', gap: 12,
+  },
+  premiumTextContainer: { flex: 1 },
+  premiumTitle: { color: '#000', fontSize: 16, fontWeight: '700' },
+  premiumSubtext: { color: '#000', fontSize: 12, opacity: 0.8 },
   legalSection: { marginTop: Spacing.lg },
   legalSectionTitle: { fontSize: 13, fontWeight: '600', color: Colors.text.muted, letterSpacing: 1, textTransform: 'uppercase', marginHorizontal: Spacing.md, marginBottom: Spacing.sm },
   menuSection: { marginHorizontal: Spacing.md, backgroundColor: Colors.bg.surface, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },

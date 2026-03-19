@@ -1,135 +1,101 @@
 import React, { useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter, Stack } from 'expo-router';
 import { Colors, Spacing, Radius } from '../src/theme';
 import { useAuth } from '../src/AuthContext';
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [autoplay, setAutoplay] = useState(true);
   const [notifications, setNotifications] = useState(true);
+  const [autoplay, setAutoplay] = useState(true);
   const [dataSaver, setDataSaver] = useState(false);
-  const [subtitles, setSubtitles] = useState(true);
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
-  const [selectedQuality, setSelectedQuality] = useState('Auto');
-  const [showLanguages, setShowLanguages] = useState(false);
-  const [showQuality, setShowQuality] = useState(false);
 
   const handleClearCache = () => {
-    Alert.alert('Clear Cache', 'This will clear cached anime data and images.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: async () => {
-        try {
-          await AsyncStorage.multiRemove(['cache_trending', 'cache_popular', 'cache_upcoming']);
-          Alert.alert('Done', 'Cache cleared successfully');
-        } catch { Alert.alert('Done', 'Cache cleared'); }
-      }},
-    ]);
-  };
-
-  const handleClearHistory = () => {
-    Alert.alert('Clear Watch History', 'This will remove all your watch history. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: () => Alert.alert('Done', 'Watch history cleared') },
-    ]);
+    Alert.alert('Clear Cache', 'Cache has been cleared successfully.');
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity testID="settings-back-btn" onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
         <View style={{ width: 40 }} />
       </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
 
-        {/* Playback Section */}
-        <Text style={styles.sectionLabel}>PLAYBACK</Text>
-        <View style={styles.section}>
-          <ToggleItem label="Autoplay Next Episode" value={autoplay} onToggle={setAutoplay} />
-          <ToggleItem label="Show Subtitles" value={subtitles} onToggle={setSubtitles} isLast />
-        </View>
-
-        {/* Video Quality */}
-        <Text style={styles.sectionLabel}>VIDEO QUALITY</Text>
-        <View style={styles.section}>
-          <TouchableOpacity testID="quality-toggle" onPress={() => setShowQuality(!showQuality)} style={styles.expandableItem}>
-            <View style={styles.expandableLeft}>
-              <Text style={styles.expandableLabel}>Video Quality</Text>
-              <Text style={styles.expandableValue}>{selectedQuality}</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Playback Settings */}
+        <Text style={styles.sectionTitle}>Playback</Text>
+        <View style={styles.settingsGroup}>
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Ionicons name="play-circle-outline" size={22} color={Colors.text.secondary} />
+              <Text style={styles.settingLabel}>Autoplay Next Episode</Text>
             </View>
-            <Ionicons name={showQuality ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.text.muted} />
-          </TouchableOpacity>
-          {showQuality && ['Auto', '1080p', '720p', '480p', '360p'].map((q, idx, arr) => (
-            <TouchableOpacity key={q} testID={`quality-${q}`} onPress={() => { setSelectedQuality(q); setShowQuality(false); }} style={[styles.selectItem, idx === arr.length - 1 && styles.lastItem]}>
-              <Text style={styles.selectLabel}>{q}</Text>
-              {selectedQuality === q && <Ionicons name="checkmark-circle" size={22} color={Colors.brand.cyan} />}
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Language */}
-        <Text style={styles.sectionLabel}>LANGUAGE</Text>
-        <View style={styles.section}>
-          <TouchableOpacity testID="language-toggle" onPress={() => setShowLanguages(!showLanguages)} style={styles.expandableItem}>
-            <View style={styles.expandableLeft}>
-              <Text style={styles.expandableLabel}>Preferred Language</Text>
-              <Text style={styles.expandableValue}>{selectedLanguage}</Text>
+            <Switch
+              value={autoplay}
+              onValueChange={setAutoplay}
+              trackColor={{ false: Colors.bg.card, true: Colors.brand.cyanDim }}
+              thumbColor={autoplay ? Colors.brand.cyan : Colors.text.muted}
+            />
+          </View>
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Ionicons name="cellular-outline" size={22} color={Colors.text.secondary} />
+              <Text style={styles.settingLabel}>Data Saver</Text>
             </View>
-            <Ionicons name={showLanguages ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.text.muted} />
-          </TouchableOpacity>
-          {showLanguages && ['English', 'Japanese', 'Spanish', 'French', 'Portuguese', 'German', 'Italian', 'Russian', 'Korean', 'Chinese', 'Arabic', 'Hindi', 'Thai', 'Indonesian', 'Vietnamese', 'Turkish', 'Polish', 'Dutch', 'Swedish', 'Norwegian'].map((lang, idx, arr) => (
-            <TouchableOpacity key={lang} testID={`lang-${lang}`} onPress={() => { setSelectedLanguage(lang); setShowLanguages(false); }} style={[styles.selectItem, idx === arr.length - 1 && styles.lastItem]}>
-              <Text style={styles.selectLabel}>{lang}</Text>
-              {selectedLanguage === lang && <Ionicons name="checkmark-circle" size={22} color={Colors.brand.cyan} />}
-            </TouchableOpacity>
-          ))}
+            <Switch
+              value={dataSaver}
+              onValueChange={setDataSaver}
+              trackColor={{ false: Colors.bg.card, true: Colors.brand.cyanDim }}
+              thumbColor={dataSaver ? Colors.brand.cyan : Colors.text.muted}
+            />
+          </View>
         </View>
 
         {/* Notifications */}
-        <Text style={styles.sectionLabel}>NOTIFICATIONS</Text>
-        <View style={styles.section}>
-          <ToggleItem label="Push Notifications" value={notifications} onToggle={setNotifications} />
-          <ToggleItem label="New Episode Alerts" value={notifications} onToggle={setNotifications} isLast />
-        </View>
-
-        {/* Content */}
-        <Text style={styles.sectionLabel}>CONTENT</Text>
-        <View style={styles.section}>
-          <ToggleItem label="Data Saver Mode" value={dataSaver} onToggle={setDataSaver} />
-          <TouchableOpacity testID="content-restrictions-btn" onPress={() => router.push('/content-restrictions')} style={[styles.selectItem, styles.lastItem]}>
-            <Text style={styles.selectLabel}>Content Restrictions</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
-          </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Notifications</Text>
+        <View style={styles.settingsGroup}>
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Ionicons name="notifications-outline" size={22} color={Colors.text.secondary} />
+              <Text style={styles.settingLabel}>Push Notifications</Text>
+            </View>
+            <Switch
+              value={notifications}
+              onValueChange={setNotifications}
+              trackColor={{ false: Colors.bg.card, true: Colors.brand.cyanDim }}
+              thumbColor={notifications ? Colors.brand.cyan : Colors.text.muted}
+            />
+          </View>
         </View>
 
         {/* Storage */}
-        <Text style={styles.sectionLabel}>STORAGE</Text>
-        <View style={styles.section}>
-          <TouchableOpacity testID="clear-cache-btn" onPress={handleClearCache} style={styles.actionItem}>
-            <Text style={styles.actionLabel}>Clear Cache</Text>
-            <Ionicons name="trash-outline" size={20} color={Colors.text.muted} />
-          </TouchableOpacity>
-          <TouchableOpacity testID="clear-history-btn" onPress={handleClearHistory} style={[styles.actionItem, styles.lastItem]}>
-            <Text style={styles.actionLabel}>Clear Watch History</Text>
-            <Ionicons name="trash-outline" size={20} color={Colors.brand.error} />
+        <Text style={styles.sectionTitle}>Storage</Text>
+        <View style={styles.settingsGroup}>
+          <TouchableOpacity onPress={handleClearCache} style={styles.settingItemBtn}>
+            <View style={styles.settingLeft}>
+              <Ionicons name="trash-outline" size={22} color={Colors.text.secondary} />
+              <Text style={styles.settingLabel}>Clear Cache</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.text.muted} />
           </TouchableOpacity>
         </View>
 
-        {/* App Info */}
-        <Text style={styles.sectionLabel}>APP INFO</Text>
-        <View style={styles.section}>
-          <View style={[styles.infoItem, styles.lastItem]}>
-            <Text style={styles.infoLabel}>Version</Text>
-            <Text style={styles.infoValue}>1.0.0</Text>
+        {/* About */}
+        <Text style={styles.sectionTitle}>About</Text>
+        <View style={styles.settingsGroup}>
+          <View style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <Ionicons name="information-circle-outline" size={22} color={Colors.text.secondary} />
+              <Text style={styles.settingLabel}>App Version</Text>
+            </View>
+            <Text style={styles.settingValue}>1.0.0</Text>
           </View>
         </View>
 
@@ -139,42 +105,34 @@ export default function SettingsScreen() {
   );
 }
 
-function ToggleItem({ label, value, onToggle, isLast = false }: { label: string; value: boolean; onToggle: (val: boolean) => void; isLast?: boolean }) {
-  return (
-    <View style={[styles.toggleItem, !isLast && styles.itemBorder]}>
-      <Text style={styles.toggleLabel}>{label}</Text>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: Colors.bg.card, true: Colors.brand.cyanDim }}
-        thumbColor={value ? Colors.brand.cyan : Colors.text.muted}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.default },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary },
-  scrollView: { flex: 1 },
-  content: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
-  sectionLabel: { fontSize: 12, fontWeight: '600', color: Colors.text.muted, letterSpacing: 1.5, marginTop: Spacing.lg, marginBottom: Spacing.sm, marginLeft: 4 },
-  section: { backgroundColor: Colors.bg.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
-  toggleItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14 },
-  toggleLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
-  itemBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  selectItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: Colors.bg.elevated },
-  lastItem: { borderBottomWidth: 0 },
-  selectLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
-  expandableItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 16 },
-  expandableLeft: { flex: 1 },
-  expandableLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
-  expandableValue: { fontSize: 13, color: Colors.brand.cyan, fontWeight: '600', marginTop: 2 },
-  actionItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  actionLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
-  infoItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  infoLabel: { fontSize: 15, color: Colors.text.primary, fontWeight: '500' },
-  infoValue: { fontSize: 15, color: Colors.text.muted },
+  content: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
+  sectionTitle: {
+    fontSize: 13, fontWeight: '600', color: Colors.text.muted, letterSpacing: 1,
+    textTransform: 'uppercase', marginTop: Spacing.lg, marginBottom: Spacing.sm,
+  },
+  settingsGroup: {
+    backgroundColor: Colors.bg.surface, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.border, overflow: 'hidden',
+  },
+  settingItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md, paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  settingItemBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md, paddingVertical: 14,
+  },
+  settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingLabel: { fontSize: 16, color: Colors.text.primary, fontWeight: '500' },
+  settingValue: { fontSize: 14, color: Colors.text.muted },
 });

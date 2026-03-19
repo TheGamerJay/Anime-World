@@ -1,38 +1,26 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Image, TouchableOpacity,
-  FlatList, ActivityIndicator, Dimensions, RefreshControl, Platform, useWindowDimensions,
+  FlatList, ActivityIndicator, RefreshControl, useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '../../src/theme';
-import { animeAPI } from '../../src/api';
+import { feedAPI, creatorAPI, seedAPI } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
+import { Series, Creator } from '../../src/types';
 
-interface AnimeItem {
-  mal_id: number;
-  title: string;
-  images: any;
-  score?: number;
-  synopsis?: string;
-  episodes?: number;
-  status?: string;
-  genres?: any[];
-}
-
-function HeroSection({ anime, onPress, isWide }: { anime: AnimeItem | null; onPress: () => void; isWide: boolean }) {
-  if (!anime) return null;
-  const imageUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
+function HeroSection({ series, onPress, isWide }: { series: Series | null; onPress: () => void; isWide: boolean }) {
+  if (!series) return null;
   const heroHeight = isWide ? 500 : undefined;
 
   return (
     <TouchableOpacity testID="hero-banner" onPress={onPress} activeOpacity={0.9} style={[styles.heroContainer, isWide && { height: heroHeight }]}>
-      <Image source={{ uri: imageUrl }} style={[styles.heroImage, isWide && { height: heroHeight }]} resizeMode={isWide ? 'cover' : 'cover'} />
       <LinearGradient
-        colors={['transparent', 'rgba(9,9,11,0.6)', '#09090B']}
-        style={styles.heroGradient}
+        colors={[series.creator_avatar_color + '40', Colors.bg.default]}
+        style={StyleSheet.absoluteFill}
       />
       <View style={[styles.heroContent, isWide && styles.heroContentWide]}>
         <View style={styles.heroBadge}>
@@ -40,8 +28,30 @@ function HeroSection({ anime, onPress, isWide }: { anime: AnimeItem | null; onPr
             <Text style={styles.badgeText}>FEATURED</Text>
           </LinearGradient>
         </View>
-        <Text style={[styles.heroTitle, isWide && styles.heroTitleWide]} numberOfLines={2}>{anime.title}</Text>
-        <Text style={[styles.heroSynopsis, isWide && styles.heroSynopsisWide]} numberOfLines={isWide ? 3 : 2}>{anime.synopsis || 'An exciting anime series awaits you!'}</Text>
+        <Text style={[styles.heroTitle, isWide && styles.heroTitleWide]} numberOfLines={2}>{series.title}</Text>
+        <View style={styles.creatorRow}>
+          <View style={[styles.creatorDot, { backgroundColor: series.creator_avatar_color }]} />
+          <Text style={styles.creatorName}>{series.creator_name}</Text>
+          <Text style={styles.statDot}>•</Text>
+          <Text style={styles.genreText}>{series.genre}</Text>
+        </View>
+        <Text style={[styles.heroSynopsis, isWide && styles.heroSynopsisWide]} numberOfLines={isWide ? 3 : 2}>
+          {series.description}
+        </Text>
+        <View style={styles.heroStats}>
+          <View style={styles.stat}>
+            <Ionicons name="eye-outline" size={14} color={Colors.text.muted} />
+            <Text style={styles.statText}>{formatCount(series.view_count)}</Text>
+          </View>
+          <View style={styles.stat}>
+            <Ionicons name="heart" size={14} color={Colors.brand.pink} />
+            <Text style={styles.statText}>{formatCount(series.like_count)}</Text>
+          </View>
+          <View style={styles.stat}>
+            <Ionicons name="film-outline" size={14} color={Colors.text.muted} />
+            <Text style={styles.statText}>{series.episode_count} eps</Text>
+          </View>
+        </View>
         <View style={styles.heroActions}>
           <TouchableOpacity testID="hero-watch-btn" onPress={onPress} style={styles.watchBtn}>
             <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.watchBtnGradient}>
@@ -59,21 +69,48 @@ function HeroSection({ anime, onPress, isWide }: { anime: AnimeItem | null; onPr
   );
 }
 
-function AnimeCard({ item, onPress, isWide }: { item: AnimeItem; onPress: () => void; isWide: boolean }) {
-  const imageUrl = item.images?.jpg?.image_url;
+function SeriesCard({ item, onPress, isWide }: { item: Series; onPress: () => void; isWide: boolean }) {
   const cardW = isWide ? 180 : 140;
-  const cardH = isWide ? 270 : 210;
+  const cardH = isWide ? 200 : 170;
   return (
-    <TouchableOpacity testID={`anime-card-${item.mal_id}`} onPress={onPress} activeOpacity={0.8} style={[styles.animeCard, { width: cardW, height: cardH }]}>
-      <Image source={{ uri: imageUrl }} style={styles.animeCardImage} />
-      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={styles.cardGradient} />
-      {item.score && (
-        <View style={styles.scoreTag}>
-          <Ionicons name="star" size={10} color={Colors.brand.warning} />
-          <Text style={styles.scoreText}>{item.score.toFixed(1)}</Text>
+    <TouchableOpacity testID={`series-card-${item.id}`} onPress={onPress} activeOpacity={0.8} style={[styles.seriesCard, { width: cardW, height: cardH }]}>
+      <LinearGradient
+        colors={[item.creator_avatar_color + '60', item.creator_avatar_color + '20', Colors.bg.card]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.cardContent}>
+        <View style={styles.cardGenreTag}>
+          <Text style={styles.cardGenreText}>{item.genre}</Text>
         </View>
-      )}
-      <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+        <View style={styles.cardBottom}>
+          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+          <View style={styles.cardCreatorRow}>
+            <View style={[styles.miniDot, { backgroundColor: item.creator_avatar_color }]} />
+            <Text style={styles.cardCreator} numberOfLines={1}>{item.creator_name}</Text>
+          </View>
+          <View style={styles.cardStats}>
+            <Ionicons name="eye-outline" size={12} color={Colors.text.muted} />
+            <Text style={styles.cardStatText}>{formatCount(item.view_count)}</Text>
+            <Ionicons name="heart" size={12} color={Colors.brand.pink} style={{ marginLeft: 6 }} />
+            <Text style={styles.cardStatText}>{formatCount(item.like_count)}</Text>
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function CreatorCard({ creator, onPress }: { creator: Creator; onPress: () => void }) {
+  const initial = creator.username.charAt(0).toUpperCase();
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.creatorCard} activeOpacity={0.8}>
+      <LinearGradient colors={[creator.avatar_color, creator.avatar_color + '60']} style={styles.creatorAvatar}>
+        <View style={styles.creatorAvatarInner}>
+          <Text style={[styles.creatorInitial, { color: creator.avatar_color }]}>{initial}</Text>
+        </View>
+      </LinearGradient>
+      <Text style={styles.creatorCardName} numberOfLines={1}>{creator.username}</Text>
+      <Text style={styles.creatorFollowers}>{formatCount(creator.follower_count)} followers</Text>
     </TouchableOpacity>
   );
 }
@@ -91,27 +128,39 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
   );
 }
 
+function formatCount(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
   const isWide = width > 768;
-  const [trending, setTrending] = useState<AnimeItem[]>([]);
-  const [popular, setPopular] = useState<AnimeItem[]>([]);
-  const [upcoming, setUpcoming] = useState<AnimeItem[]>([]);
+  const [featured, setFeatured] = useState<Series[]>([]);
+  const [trending, setTrending] = useState<Series[]>([]);
+  const [latest, setLatest] = useState<Series[]>([]);
+  const [topCreators, setTopCreators] = useState<Creator[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [trendingRes, popularRes, upcomingRes] = await Promise.all([
-        animeAPI.getTop('airing', 1),
-        animeAPI.getTop('bypopularity', 1),
-        animeAPI.getTop('upcoming', 1),
+      // Try to seed data first (only seeds if empty)
+      try { await seedAPI.seed(); } catch {}
+
+      const [featuredRes, trendingRes, latestRes, creatorsRes] = await Promise.all([
+        feedAPI.getFeatured(),
+        feedAPI.getTrending(),
+        feedAPI.getLatest(),
+        creatorAPI.getTopCreators(),
       ]);
+      setFeatured(featuredRes.data || []);
       setTrending(trendingRes.data || []);
-      setPopular(popularRes.data || []);
-      setUpcoming(upcomingRes.data || []);
+      setLatest(latestRes.data || []);
+      setTopCreators(creatorsRes.data || []);
     } catch (err) {
       console.error('Failed to load home data:', err);
     } finally {
@@ -129,8 +178,12 @@ export default function HomeScreen() {
     loadData();
   };
 
-  const navigateToAnime = (id: number) => {
-    router.push(`/anime/${id}`);
+  const navigateToSeries = (id: string) => {
+    router.push(`/series/${id}`);
+  };
+
+  const navigateToCreator = (id: string) => {
+    router.push(`/creator/${id}`);
   };
 
   if (loading) {
@@ -141,7 +194,7 @@ export default function HomeScreen() {
     );
   }
 
-  const heroAnime = trending[0] || null;
+  const heroSeries = featured[0] || trending[0] || null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -158,6 +211,11 @@ export default function HomeScreen() {
             <View style={styles.userBadge}>
               <Ionicons name="person-circle" size={28} color={Colors.brand.cyan} />
               <Text style={styles.userNameText}>{user.username}</Text>
+              {user.is_creator && (
+                <View style={styles.creatorBadge}>
+                  <Ionicons name="checkmark-circle" size={14} color={Colors.brand.success} />
+                </View>
+              )}
             </View>
           ) : (
             <View style={styles.authButtons}>
@@ -175,47 +233,51 @@ export default function HomeScreen() {
 
         {/* Hero */}
         <View style={isWide ? styles.heroWrapper : undefined}>
-          <HeroSection anime={heroAnime} onPress={() => heroAnime && navigateToAnime(heroAnime.mal_id)} isWide={isWide} />
+          <HeroSection series={heroSeries} onPress={() => heroSeries && navigateToSeries(heroSeries.id)} isWide={isWide} />
         </View>
 
         {/* Content area with max width on desktop */}
         <View style={isWide ? styles.contentWrapper : undefined}>
-          {/* Trending Now */}
-          <SectionHeader title="Trending Now" />
+          {/* Top Creators */}
+          {topCreators.length > 0 && (
+            <>
+              <SectionHeader title="Top Creators" />
+              <FlatList
+                data={topCreators.slice(0, 10)}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => `creator-${item.id}`}
+                contentContainerStyle={styles.horizontalList}
+                renderItem={({ item }) => (
+                  <CreatorCard creator={item} onPress={() => navigateToCreator(item.id)} />
+                )}
+              />
+            </>
+          )}
+
+          {/* Trending */}
+          <SectionHeader title="Trending Now" onSeeAll={() => router.push('/browse')} />
           <FlatList
             data={trending.slice(0, 20)}
             horizontal
             showsHorizontalScrollIndicator={false}
-            keyExtractor={(item, index) => `trending-${item.mal_id}-${index}`}
+            keyExtractor={(item) => `trending-${item.id}`}
             contentContainerStyle={styles.horizontalList}
             renderItem={({ item }) => (
-              <AnimeCard item={item} onPress={() => navigateToAnime(item.mal_id)} isWide={isWide} />
+              <SeriesCard item={item} onPress={() => navigateToSeries(item.id)} isWide={isWide} />
             )}
           />
 
-          {/* Most Popular */}
-          <SectionHeader title="Most Popular" />
+          {/* Latest Releases */}
+          <SectionHeader title="Latest Releases" onSeeAll={() => router.push('/browse')} />
           <FlatList
-            data={popular.slice(0, 20)}
+            data={latest.slice(0, 20)}
             horizontal
             showsHorizontalScrollIndicator={false}
-            keyExtractor={(item, index) => `popular-${item.mal_id}-${index}`}
+            keyExtractor={(item) => `latest-${item.id}`}
             contentContainerStyle={styles.horizontalList}
             renderItem={({ item }) => (
-              <AnimeCard item={item} onPress={() => navigateToAnime(item.mal_id)} isWide={isWide} />
-            )}
-          />
-
-          {/* Coming Soon */}
-          <SectionHeader title="Coming Soon" />
-          <FlatList
-            data={upcoming.slice(0, 20)}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item, index) => `upcoming-${item.mal_id}-${index}`}
-            contentContainerStyle={styles.horizontalList}
-            renderItem={({ item }) => (
-              <AnimeCard item={item} onPress={() => navigateToAnime(item.mal_id)} isWide={isWide} />
+              <SeriesCard item={item} onPress={() => navigateToSeries(item.id)} isWide={isWide} />
             )}
           />
 
@@ -250,19 +312,26 @@ const styles = StyleSheet.create({
   signupHeaderText: { color: '#000', fontWeight: '700', fontSize: 13 },
   userBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   userNameText: { color: Colors.brand.cyan, fontWeight: '600', fontSize: 14 },
-  heroWrapper: { maxHeight: 500, overflow: 'hidden' },
-  heroContainer: { width: '100%', aspectRatio: 0.9, position: 'relative', maxHeight: 500 },
-  heroImage: { width: '100%', height: '100%' },
-  heroGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
-  heroContent: { position: 'absolute', bottom: Spacing.lg, left: Spacing.md, right: Spacing.md },
-  heroContentWide: { left: 48, right: '40%', bottom: 40 },
+  creatorBadge: { marginLeft: -4 },
+  heroWrapper: { maxHeight: 400, overflow: 'hidden' },
+  heroContainer: { width: '100%', minHeight: 300, position: 'relative', paddingTop: Spacing.xl },
+  heroContent: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.lg },
+  heroContentWide: { paddingHorizontal: 48, maxWidth: '60%' },
   heroBadge: { marginBottom: Spacing.sm },
   badgeGradient: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: Radius.full, alignSelf: 'flex-start' },
   badgeText: { color: '#000', fontWeight: '800', fontSize: 11, letterSpacing: 1.5 },
-  heroTitle: { fontSize: 28, fontWeight: '800', color: Colors.text.primary, letterSpacing: -0.5, lineHeight: 34, marginBottom: 6 },
+  heroTitle: { fontSize: 28, fontWeight: '800', color: Colors.text.primary, letterSpacing: -0.5, lineHeight: 34, marginBottom: 8 },
   heroTitleWide: { fontSize: 38, lineHeight: 46 },
-  heroSynopsis: { fontSize: 14, color: Colors.text.secondary, lineHeight: 20, marginBottom: Spacing.md },
+  creatorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  creatorDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  creatorName: { color: Colors.text.secondary, fontSize: 14, fontWeight: '600' },
+  statDot: { color: Colors.text.muted, marginHorizontal: 6 },
+  genreText: { color: Colors.brand.pink, fontSize: 13, fontWeight: '600' },
+  heroSynopsis: { fontSize: 14, color: Colors.text.secondary, lineHeight: 20, marginBottom: Spacing.sm },
   heroSynopsisWide: { fontSize: 16, lineHeight: 24 },
+  heroStats: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: Spacing.md },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statText: { color: Colors.text.muted, fontSize: 13 },
   heroActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   watchBtn: { borderRadius: Radius.full, overflow: 'hidden' },
   watchBtnGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 6 },
@@ -274,14 +343,23 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 20, fontWeight: '700', color: Colors.text.primary },
   seeAllText: { fontSize: 14, color: Colors.brand.cyan, fontWeight: '600' },
   horizontalList: { paddingHorizontal: Spacing.md, gap: 12 },
-  animeCard: { borderRadius: Radius.sm, overflow: 'hidden', position: 'relative' },
-  animeCardImage: { width: '100%', height: '100%' },
-  cardGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' },
-  scoreTag: {
-    position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: Radius.full, gap: 3,
-  },
-  scoreText: { color: Colors.brand.warning, fontWeight: '700', fontSize: 11 },
-  cardTitle: { position: 'absolute', bottom: 8, left: 8, right: 8, color: Colors.text.primary, fontWeight: '600', fontSize: 12, lineHeight: 16 },
+  // Series Card
+  seriesCard: { borderRadius: Radius.sm, overflow: 'hidden', position: 'relative' },
+  cardContent: { flex: 1, justifyContent: 'space-between', padding: 10 },
+  cardGenreTag: { backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full, alignSelf: 'flex-start' },
+  cardGenreText: { color: Colors.brand.cyan, fontSize: 10, fontWeight: '700' },
+  cardBottom: { marginTop: 'auto' },
+  cardTitle: { color: Colors.text.primary, fontWeight: '700', fontSize: 13, lineHeight: 17, marginBottom: 4 },
+  cardCreatorRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  miniDot: { width: 6, height: 6, borderRadius: 3, marginRight: 4 },
+  cardCreator: { color: Colors.text.muted, fontSize: 11, flex: 1 },
+  cardStats: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  cardStatText: { color: Colors.text.muted, fontSize: 11 },
+  // Creator Card
+  creatorCard: { alignItems: 'center', width: 80, marginRight: 4 },
+  creatorAvatar: { width: 60, height: 60, borderRadius: 30, padding: 2 },
+  creatorAvatarInner: { flex: 1, borderRadius: 28, backgroundColor: Colors.bg.default, justifyContent: 'center', alignItems: 'center' },
+  creatorInitial: { fontSize: 22, fontWeight: '800' },
+  creatorCardName: { color: Colors.text.primary, fontSize: 12, fontWeight: '600', marginTop: 6, textAlign: 'center' },
+  creatorFollowers: { color: Colors.text.muted, fontSize: 10, marginTop: 2 },
 });

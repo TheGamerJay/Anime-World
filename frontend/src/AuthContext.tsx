@@ -1,12 +1,19 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from './api';
 
-interface User {
+export interface User {
   id: string;
   username: string;
   email: string;
-  avatar_url?: string;
+  avatar_color: string;
+  bio: string;
+  is_creator: boolean;
+  is_premium: boolean;
+  follower_count: number;
+  following_count: number;
+  total_earnings: number;
+  balance: number;
   created_at: string;
 }
 
@@ -17,6 +24,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  becomeCreator: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,6 +35,8 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   register: async () => {},
   logout: async () => {},
+  refreshUser: async () => {},
+  becomeCreator: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -72,8 +83,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const userData = await authAPI.getMe();
+      setUser(userData);
+    } catch {}
+  }, []);
+
+  async function becomeCreator() {
+    await authAPI.becomeCreator();
+    await refreshUser();
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser, becomeCreator }}>
       {children}
     </AuthContext.Provider>
   );

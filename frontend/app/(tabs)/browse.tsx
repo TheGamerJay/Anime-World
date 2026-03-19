@@ -1,191 +1,252 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity,
-  Image, ActivityIndicator, ScrollView, Dimensions,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  FlatList, ActivityIndicator, TextInput, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '../../src/theme';
-import { animeAPI } from '../../src/api';
+import { seriesAPI, feedAPI } from '../../src/api';
+import { Series } from '../../src/types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - Spacing.md * 2 - 12) / 2;
+function formatCount(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+}
 
-const GENRE_CHIPS = [
-  { id: 1, name: 'Action' }, { id: 2, name: 'Adventure' }, { id: 4, name: 'Comedy' },
-  { id: 8, name: 'Drama' }, { id: 10, name: 'Fantasy' }, { id: 14, name: 'Horror' },
-  { id: 22, name: 'Romance' }, { id: 24, name: 'Sci-Fi' }, { id: 36, name: 'Slice of Life' },
-  { id: 30, name: 'Sports' }, { id: 37, name: 'Supernatural' }, { id: 7, name: 'Mystery' },
-];
+function SeriesListItem({ item, onPress }: { item: Series; onPress: () => void }) {
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.listItem} activeOpacity={0.8}>
+      <LinearGradient
+        colors={[item.creator_avatar_color + '40', Colors.bg.card]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.listItemGradient}
+      />
+      <View style={styles.listItemContent}>
+        <View style={styles.listItemLeft}>
+          <Text style={styles.listItemTitle} numberOfLines={1}>{item.title}</Text>
+          <View style={styles.listItemMeta}>
+            <View style={[styles.creatorDot, { backgroundColor: item.creator_avatar_color }]} />
+            <Text style={styles.listItemCreator}>{item.creator_name}</Text>
+            <Text style={styles.metaDot}>•</Text>
+            <Text style={styles.listItemGenre}>{item.genre}</Text>
+          </View>
+          <View style={styles.listItemStats}>
+            <Ionicons name="eye-outline" size={12} color={Colors.text.muted} />
+            <Text style={styles.statText}>{formatCount(item.view_count)}</Text>
+            <Ionicons name="heart" size={12} color={Colors.brand.pink} style={{ marginLeft: 8 }} />
+            <Text style={styles.statText}>{formatCount(item.like_count)}</Text>
+            <Ionicons name="film-outline" size={12} color={Colors.text.muted} style={{ marginLeft: 8 }} />
+            <Text style={styles.statText}>{item.episode_count} eps</Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function BrowseScreen() {
   const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [series, setSeries] = useState<Series[]>([]);
+  const [genres, setGenres] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState('all');
+  const [sortBy, setSortBy] = useState('popular');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Series[] | null>(null);
 
-  const searchAnime = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) return;
-    setLoading(true);
-    setHasSearched(true);
+  const loadData = useCallback(async () => {
     try {
-      const res = await animeAPI.search(searchQuery);
-      setResults(res.data || []);
+      const [seriesRes, genresRes] = await Promise.all([
+        seriesAPI.getAll(selectedGenre, sortBy),
+        feedAPI.getGenres(),
+      ]);
+      setSeries(seriesRes.data || []);
+      setGenres(genresRes.genres || []);
     } catch (err) {
-      console.error('Search error:', err);
+      console.error('Failed to load browse data:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, []);
+  }, [selectedGenre, sortBy]);
 
-  const searchByGenre = useCallback(async (genreName: string) => {
-    setLoading(true);
-    setHasSearched(true);
-    setSelectedGenre(genreName);
-    try {
-      const res = await animeAPI.search(genreName);
-      setResults(res.data || []);
-    } catch (err) {
-      console.error('Genre search error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const renderAnimeItem = ({ item }: { item: any }) => {
-    const imageUrl = item.images?.jpg?.image_url;
-    return (
-      <TouchableOpacity
-        testID={`browse-card-${item.mal_id}`}
-        onPress={() => router.push(`/anime/${item.mal_id}`)}
-        activeOpacity={0.8}
-        style={styles.gridCard}
-      >
-        <Image source={{ uri: imageUrl }} style={styles.gridImage} />
-        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.9)']} style={styles.gridGradient} />
-        {item.score && (
-          <View style={styles.scoreTag}>
-            <Ionicons name="star" size={10} color={Colors.brand.warning} />
-            <Text style={styles.scoreText}>{item.score.toFixed(1)}</Text>
-          </View>
-        )}
-        <View style={styles.gridInfo}>
-          <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
-          {item.episodes && (
-            <Text style={styles.gridEpisodes}>{item.episodes} eps</Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
+  useEffect(() => {
+    const debounce = setTimeout(async () => {
+      if (searchQuery.trim().length > 0) {
+        try {
+          const res = await seriesAPI.search(searchQuery);
+          setSearchResults(res.data || []);
+        } catch {
+          setSearchResults([]);
+        }
+      } else {
+        setSearchResults(null);
+      }
+    }, 300);
+    return () => clearTimeout(debounce);
+  }, [searchQuery]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
   };
+
+  const navigateToSeries = (id: string) => {
+    router.push(`/series/${id}`);
+  };
+
+  const displayData = searchResults !== null ? searchResults : series;
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.brand.cyan} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.headerSection}>
+      <View style={styles.header}>
         <Text style={styles.pageTitle}>Browse</Text>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={Colors.text.muted} />
-          <TextInput
-            testID="search-input"
-            style={styles.searchInput}
-            placeholder="Search anime..."
-            placeholderTextColor={Colors.text.muted}
-            value={query}
-            onChangeText={setQuery}
-            onSubmitEditing={() => searchAnime(query)}
-            returnKeyType="search"
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => { setQuery(''); setResults([]); setHasSearched(false); }}>
-              <Ionicons name="close-circle" size={20} color={Colors.text.muted} />
-            </TouchableOpacity>
-          )}
-        </View>
       </View>
 
-      {/* Genre Chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.genreRow}>
-        {GENRE_CHIPS.map((genre) => (
-          <TouchableOpacity
-            key={genre.id}
-            testID={`genre-chip-${genre.id}`}
-            onPress={() => searchByGenre(genre.name)}
-            style={[styles.genreChip, selectedGenre === genre.name && styles.genreChipActive]}
-          >
-            <Text style={[styles.genreChipText, selectedGenre === genre.name && styles.genreChipTextActive]}>
-              {genre.name}
-            </Text>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color={Colors.text.muted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search series..."
+          placeholderTextColor={Colors.text.muted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color={Colors.text.muted} />
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        )}
+      </View>
+
+      {/* Genre Filter */}
+      {searchResults === null && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.genreList}
+        >
+          <TouchableOpacity
+            onPress={() => setSelectedGenre('all')}
+            style={[styles.genreChip, selectedGenre === 'all' && styles.genreChipActive]}
+          >
+            <Text style={[styles.genreChipText, selectedGenre === 'all' && styles.genreChipTextActive]}>All</Text>
+          </TouchableOpacity>
+          {genres.map((genre) => (
+            <TouchableOpacity
+              key={genre}
+              onPress={() => setSelectedGenre(genre)}
+              style={[styles.genreChip, selectedGenre === genre && styles.genreChipActive]}
+            >
+              <Text style={[styles.genreChipText, selectedGenre === genre && styles.genreChipTextActive]}>{genre}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Sort Options */}
+      {searchResults === null && (
+        <View style={styles.sortRow}>
+          {['popular', 'latest', 'liked'].map((sort) => (
+            <TouchableOpacity
+              key={sort}
+              onPress={() => setSortBy(sort)}
+              style={[styles.sortBtn, sortBy === sort && styles.sortBtnActive]}
+            >
+              <Text style={[styles.sortText, sortBy === sort && styles.sortTextActive]}>
+                {sort === 'popular' ? 'Most Popular' : sort === 'latest' ? 'Latest' : 'Most Liked'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* Results */}
-      {loading ? (
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.brand.cyan} />
-        </View>
-      ) : !hasSearched ? (
-        <View style={styles.centerContent}>
-          <Ionicons name="search" size={64} color={Colors.text.muted} />
-          <Text style={styles.emptyText}>Search for your favorite anime</Text>
-          <Text style={styles.emptySubtext}>Or tap a genre to explore</Text>
-        </View>
-      ) : results.length === 0 ? (
-        <View style={styles.centerContent}>
-          <Ionicons name="sad-outline" size={64} color={Colors.text.muted} />
-          <Text style={styles.emptyText}>No results found</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={results}
-          numColumns={2}
-          keyExtractor={(item) => `browse-${item.mal_id}`}
-          contentContainerStyle={styles.gridContainer}
-          columnWrapperStyle={styles.gridRow}
-          renderItem={renderAnimeItem}
-        />
-      )}
+      <FlatList
+        data={displayData}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.brand.cyan} />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="film-outline" size={48} color={Colors.text.muted} />
+            <Text style={styles.emptyText}>
+              {searchResults !== null ? 'No results found' : 'No series found'}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <SeriesListItem item={item} onPress={() => navigateToSeries(item.id)} />
+        )}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.default },
-  headerSection: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
-  pageTitle: { fontSize: 28, fontWeight: '800', color: Colors.text.primary, marginBottom: Spacing.md },
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bg.card,
-    borderRadius: Radius.md, paddingHorizontal: Spacing.md, height: 48,
-    borderWidth: 1, borderColor: Colors.border, gap: 10,
+  loadingContainer: { flex: 1, backgroundColor: Colors.bg.default, justifyContent: 'center', alignItems: 'center' },
+  header: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.sm },
+  pageTitle: { fontSize: 28, fontWeight: '800', color: Colors.text.primary },
+  searchContainer: {
+    flexDirection: 'row', alignItems: 'center', marginHorizontal: Spacing.md,
+    backgroundColor: Colors.bg.surface, borderRadius: Radius.md, paddingHorizontal: 12,
+    paddingVertical: 10, gap: 8, borderWidth: 1, borderColor: Colors.border,
   },
   searchInput: { flex: 1, color: Colors.text.primary, fontSize: 16 },
-  genreRow: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, gap: 8 },
+  genreList: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 8 },
   genreChip: {
-    paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full,
-    backgroundColor: Colors.bg.card, borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full,
+    backgroundColor: Colors.bg.surface, borderWidth: 1, borderColor: Colors.border,
   },
-  genreChipActive: { borderColor: Colors.brand.cyan, backgroundColor: Colors.brand.cyanDim },
-  genreChipText: { color: Colors.text.secondary, fontWeight: '600', fontSize: 13 },
+  genreChipActive: { backgroundColor: Colors.brand.cyanDim, borderColor: Colors.brand.cyan },
+  genreChipText: { color: Colors.text.secondary, fontSize: 13, fontWeight: '600' },
   genreChipTextActive: { color: Colors.brand.cyan },
-  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  emptyText: { fontSize: 18, fontWeight: '600', color: Colors.text.secondary },
-  emptySubtext: { fontSize: 14, color: Colors.text.muted },
-  gridContainer: { paddingHorizontal: Spacing.md, paddingBottom: 100 },
-  gridRow: { gap: 12, marginBottom: 12 },
-  gridCard: { width: CARD_WIDTH, height: CARD_WIDTH * 1.5, borderRadius: Radius.sm, overflow: 'hidden', position: 'relative' },
-  gridImage: { width: '100%', height: '100%' },
-  gridGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%' },
-  scoreTag: {
-    position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2,
-    borderRadius: Radius.full, gap: 3,
+  sortRow: { flexDirection: 'row', paddingHorizontal: Spacing.md, gap: 8, marginBottom: Spacing.sm },
+  sortBtn: { paddingHorizontal: 12, paddingVertical: 6 },
+  sortBtnActive: { borderBottomWidth: 2, borderBottomColor: Colors.brand.pink },
+  sortText: { color: Colors.text.muted, fontSize: 13, fontWeight: '600' },
+  sortTextActive: { color: Colors.brand.pink },
+  listContent: { paddingHorizontal: Spacing.md, paddingBottom: 100 },
+  listItem: {
+    marginBottom: Spacing.sm, borderRadius: Radius.md, overflow: 'hidden',
+    borderWidth: 1, borderColor: Colors.border,
   },
-  scoreText: { color: Colors.brand.warning, fontWeight: '700', fontSize: 11 },
-  gridInfo: { position: 'absolute', bottom: 8, left: 8, right: 8 },
-  gridTitle: { color: Colors.text.primary, fontWeight: '600', fontSize: 13, lineHeight: 18 },
-  gridEpisodes: { color: Colors.text.muted, fontSize: 11, marginTop: 2 },
+  listItemGradient: { ...StyleSheet.absoluteFillObject },
+  listItemContent: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: Spacing.md,
+  },
+  listItemLeft: { flex: 1, marginRight: Spacing.sm },
+  listItemTitle: { fontSize: 16, fontWeight: '700', color: Colors.text.primary, marginBottom: 4 },
+  listItemMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  creatorDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  listItemCreator: { color: Colors.text.secondary, fontSize: 12 },
+  metaDot: { color: Colors.text.muted, marginHorizontal: 6 },
+  listItemGenre: { color: Colors.brand.pink, fontSize: 12, fontWeight: '600' },
+  listItemStats: { flexDirection: 'row', alignItems: 'center' },
+  statText: { color: Colors.text.muted, fontSize: 11, marginLeft: 3 },
+  emptyContainer: { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyText: { color: Colors.text.muted, fontSize: 16 },
 });

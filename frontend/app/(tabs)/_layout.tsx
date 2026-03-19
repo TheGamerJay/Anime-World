@@ -2,8 +2,11 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Platform } from 'react-native';
 import { Colors } from '../../src/theme';
+import { useAuth } from '../../src/AuthContext';
 
 export default function TabsLayout() {
+  const { user } = useAuth();
+
   return (
     <Tabs
       screenOptions={{
@@ -14,43 +17,52 @@ export default function TabsLayout() {
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Home',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="browse"
-          options={{
-            title: 'Browse',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={24} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="watchlist"
-          options={{
-            title: 'My List',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'bookmark' : 'bookmark-outline'} size={24} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
-            ),
-          }}
-        />
-      </Tabs>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="browse"
+        options={{
+          title: 'Browse',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'compass' : 'compass-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="watchlist"
+        options={{
+          title: 'My List',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'bookmark' : 'bookmark-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="studio"
+        options={{
+          title: user?.is_creator ? 'Studio' : 'Create',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'videocam' : 'videocam-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
 

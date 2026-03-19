@@ -42,38 +42,89 @@ export const authAPI = {
   login: (email: string, password: string) =>
     apiCall('/auth/login', { method: 'POST', body: { email, password } }),
   getMe: () => apiCall('/auth/me', { auth: true }),
+  becomeCreator: () => apiCall('/auth/become-creator', { method: 'PUT', auth: true }),
 };
 
-// Anime
-export const animeAPI = {
-  search: (q: string, page = 1) => apiCall(`/anime/search?q=${encodeURIComponent(q)}&page=${page}`),
-  getTop: (filter = 'airing', page = 1) => apiCall(`/anime/top?filter=${filter}&page=${page}`),
-  getSeasonal: (year: number, season: string, page = 1) =>
-    apiCall(`/anime/seasonal?year=${year}&season=${season}&page=${page}`),
-  getGenres: () => apiCall('/anime/genres'),
-  getDetail: (id: number) => apiCall(`/anime/${id}`),
-  getEpisodes: (id: number, page = 1) => apiCall(`/anime/${id}/episodes?page=${page}`),
-  getRecommendations: (id: number) => apiCall(`/anime/${id}/recommendations`),
+// Series (Original Content)
+export const seriesAPI = {
+  getAll: (genre?: string, sort?: string, page = 1) => {
+    const params = new URLSearchParams();
+    if (genre && genre !== 'all') params.append('genre', genre);
+    if (sort) params.append('sort', sort);
+    params.append('page', page.toString());
+    return apiCall(`/series?${params.toString()}`);
+  },
+  search: (q: string) => apiCall(`/series/search?q=${encodeURIComponent(q)}`),
+  get: (id: string) => apiCall(`/series/${id}`),
+  getEpisodes: (id: string) => apiCall(`/series/${id}/episodes`),
+  create: (data: any) => apiCall('/series', { method: 'POST', body: data, auth: true }),
+  delete: (id: string) => apiCall(`/series/${id}`, { method: 'DELETE', auth: true }),
+};
+
+// Episodes
+export const episodeAPI = {
+  create: (data: any) => apiCall('/episodes', { method: 'POST', body: data, auth: true }),
+  delete: (id: string) => apiCall(`/episodes/${id}`, { method: 'DELETE', auth: true }),
+};
+
+// Creators
+export const creatorAPI = {
+  getProfile: (userId: string) => apiCall(`/creators/${userId}`),
+  getTopCreators: () => apiCall('/feed/top-creators'),
+};
+
+// Feed
+export const feedAPI = {
+  getFeatured: () => apiCall('/feed/featured'),
+  getTrending: () => apiCall('/feed/trending'),
+  getLatest: () => apiCall('/feed/latest'),
+  getGenres: () => apiCall('/genres'),
+};
+
+// Follow System
+export const followAPI = {
+  follow: (creatorId: string) => apiCall(`/follow/${creatorId}`, { method: 'POST', auth: true }),
+  unfollow: (creatorId: string) => apiCall(`/follow/${creatorId}`, { method: 'DELETE', auth: true }),
+  checkFollow: (creatorId: string) => apiCall(`/follow/check/${creatorId}`, { auth: true }),
+};
+
+// Likes
+export const likeAPI = {
+  toggleLike: (seriesId: string) => apiCall(`/like/series/${seriesId}`, { method: 'POST', auth: true }),
+  checkLike: (seriesId: string) => apiCall(`/like/check/${seriesId}`, { auth: true }),
 };
 
 // Watchlist
 export const watchlistAPI = {
   getAll: () => apiCall('/watchlist', { auth: true }),
-  add: (item: any) => apiCall('/watchlist', { method: 'POST', body: item, auth: true }),
-  remove: (animeId: number) => apiCall(`/watchlist/${animeId}`, { method: 'DELETE', auth: true }),
-  check: (animeId: number) => apiCall(`/watchlist/check/${animeId}`, { auth: true }),
+  add: (seriesId: string) => apiCall(`/watchlist/${seriesId}`, { method: 'POST', auth: true }),
+  remove: (seriesId: string) => apiCall(`/watchlist/${seriesId}`, { method: 'DELETE', auth: true }),
 };
 
-// History
-export const historyAPI = {
-  update: (item: any) => apiCall('/history', { method: 'POST', body: item, auth: true }),
-  getAll: () => apiCall('/history', { auth: true }),
+// My Content (Creator Studio)
+export const myContentAPI = {
+  getMySeries: () => apiCall('/my/series', { auth: true }),
+  getMyEarnings: () => apiCall('/my/earnings', { auth: true }),
 };
 
-// Profiles
-export const profilesAPI = {
-  getAll: () => apiCall('/profiles', { auth: true }),
-  create: (name: string, avatar_color: string) => apiCall('/profiles', { method: 'POST', body: { name, avatar_color }, auth: true }),
-  switchTo: (profileId: string) => apiCall(`/profiles/${profileId}/switch`, { method: 'PUT', auth: true }),
-  remove: (profileId: string) => apiCall(`/profiles/${profileId}`, { method: 'DELETE', auth: true }),
+// Payments
+export const paymentsAPI = {
+  createTip: (tipSize: string, creatorId: string, originUrl: string) =>
+    apiCall(`/payments/tip?tip_size=${tipSize}&creator_id=${creatorId}&origin_url=${encodeURIComponent(originUrl)}`, { method: 'POST', auth: true }),
+  createPremium: (originUrl: string) =>
+    apiCall(`/payments/premium?origin_url=${encodeURIComponent(originUrl)}`, { method: 'POST', auth: true }),
+  createChannelSub: (creatorId: string, originUrl: string) =>
+    apiCall(`/payments/channel-sub?creator_id=${creatorId}&origin_url=${encodeURIComponent(originUrl)}`, { method: 'POST', auth: true }),
+  getStatus: (sessionId: string) => apiCall(`/payments/status/${sessionId}`),
+};
+
+// Profile Update
+export const profileAPI = {
+  update: (bio: string, avatarColor: string) =>
+    apiCall(`/profile/update?bio=${encodeURIComponent(bio)}&avatar_color=${encodeURIComponent(avatarColor)}`, { method: 'PUT', auth: true }),
+};
+
+// Seed (dev only)
+export const seedAPI = {
+  seed: () => apiCall('/seed', { method: 'POST' }),
 };
