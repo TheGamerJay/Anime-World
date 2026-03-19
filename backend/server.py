@@ -53,6 +53,8 @@ class SeriesCreate(BaseModel):
     title: str
     description: str
     genre: str
+    custom_genre: Optional[str] = None  # For custom genres
+    content_type: str = "series"  # series, novel, movie
     tags: List[str] = []
     thumbnail_base64: Optional[str] = None
     cover_base64: Optional[str] = None
@@ -195,12 +197,20 @@ async def reset_password(token: str, new_password: str):
 async def create_series(data: SeriesCreate, user=Depends(get_current_user)):
     if not user.get("is_creator"):
         raise HTTPException(status_code=403, detail="You must be a creator to upload")
+    
+    # Handle custom genre
+    final_genre = data.custom_genre if data.genre == "Custom" and data.custom_genre else data.genre
+    
+    # Validate content type
+    valid_content_types = ["series", "novel", "movie"]
+    content_type = data.content_type if data.content_type in valid_content_types else "series"
+    
     series_id = str(uuid.uuid4())
     series_doc = {
         "id": series_id, "creator_id": user["id"], "creator_name": user["username"],
         "creator_avatar_color": user.get("avatar_color", "#00F0FF"),
         "title": data.title, "description": data.description,
-        "genre": data.genre, "tags": data.tags,
+        "genre": final_genre, "content_type": content_type, "tags": data.tags,
         "thumbnail_base64": data.thumbnail_base64, "cover_base64": data.cover_base64,
         "episode_count": 0, "view_count": 0, "like_count": 0,
         "subscriber_count": 0, "is_featured": False,
