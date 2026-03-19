@@ -113,7 +113,7 @@ export default function AuthScreen() {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.emojiBtn}>
                   <Text style={styles.monkeyEmoji}>{showPassword ? '\u{1F648}' : '\u{1F649}'}</Text>
                 </TouchableOpacity>
               </View>
@@ -162,15 +162,16 @@ const styles = StyleSheet.create({
   inputLabel: { fontSize: 12, fontWeight: '600', color: Colors.text.muted, letterSpacing: 1.5 },
   inputWrapper: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bg.card,
-    borderRadius: Radius.md, paddingHorizontal: Spacing.md, height: 52,
+    borderRadius: Radius.md, paddingLeft: Spacing.md, paddingRight: 8, height: 52,
     borderWidth: 1, borderColor: Colors.border, gap: 12,
   },
   input: { flex: 1, color: Colors.text.primary, fontSize: 16 },
+  emojiBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   submitBtn: { borderRadius: Radius.full, overflow: 'hidden', marginTop: 8 },
   submitGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
   submitText: { color: '#000', fontWeight: '700', fontSize: 17 },
   toggleBtn: { alignItems: 'center', paddingVertical: 16 },
   toggleText: { fontSize: 14, color: Colors.text.secondary },
   toggleTextHighlight: { color: Colors.brand.cyan, fontWeight: '600' },
-  monkeyEmoji: { fontSize: 22 },
+  monkeyEmoji: { fontSize: 26 },
 });
