@@ -15,7 +15,6 @@ export default function SettingsScreen() {
   const [autoplay, setAutoplay] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [dataSaver, setDataSaver] = useState(false);
-  const [matureContent, setMatureContent] = useState(false);
   const [subtitles, setSubtitles] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [selectedQuality, setSelectedQuality] = useState('Auto');
@@ -71,7 +70,7 @@ export default function SettingsScreen() {
         {/* Language */}
         <Text style={styles.sectionLabel}>LANGUAGE</Text>
         <View style={styles.section}>
-          {['English', 'Japanese', 'Spanish', 'French', 'Portuguese', 'German'].map((lang, idx, arr) => (
+          {['English', 'Japanese', 'Spanish', 'French', 'Portuguese', 'German', 'Italian', 'Russian', 'Korean', 'Chinese', 'Arabic', 'Hindi', 'Thai', 'Indonesian', 'Vietnamese', 'Turkish', 'Polish', 'Dutch', 'Swedish', 'Norwegian'].map((lang, idx, arr) => (
             <TouchableOpacity key={lang} testID={`lang-${lang}`} onPress={() => setSelectedLanguage(lang)} style={[styles.selectItem, idx === arr.length - 1 && styles.lastItem]}>
               <Text style={styles.selectLabel}>{lang}</Text>
               {selectedLanguage === lang && <Ionicons name="checkmark-circle" size={22} color={Colors.brand.cyan} />}
@@ -90,7 +89,10 @@ export default function SettingsScreen() {
         <Text style={styles.sectionLabel}>CONTENT</Text>
         <View style={styles.section}>
           <ToggleItem label="Data Saver Mode" value={dataSaver} onToggle={setDataSaver} />
-          <ToggleItem label="Mature Content (18+)" value={matureContent} onToggle={setMatureContent} isLast />
+          <TouchableOpacity testID="content-restrictions-btn" onPress={() => router.push('/content-restrictions')} style={[styles.selectItem, styles.lastItem]}>
+            <Text style={styles.selectLabel}>Content Restrictions</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.text.muted} />
+          </TouchableOpacity>
         </View>
 
         {/* Storage */}
