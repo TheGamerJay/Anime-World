@@ -3,8 +3,8 @@ FROM node:20-alpine AS frontend-build
 
 WORKDIR /app/frontend
 
-COPY frontend/package.json frontend/yarn.lock ./
-RUN yarn install --frozen-lockfile
+COPY frontend/package.json ./
+RUN yarn install
 
 COPY frontend/ .
 RUN npx expo export --platform web
