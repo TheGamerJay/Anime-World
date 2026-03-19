@@ -134,8 +134,34 @@ export const paymentsAPI = {
 
 // Profile Update
 export const profileAPI = {
-  update: (bio: string, avatarColor: string) =>
-    apiCall(`/profile/update?bio=${encodeURIComponent(bio)}&avatar_color=${encodeURIComponent(avatarColor)}`, { method: 'PUT', auth: true }),
+  update: (data: { bio?: string; avatar_color?: string }) =>
+    apiCall('/profile', { method: 'PUT', body: data, auth: true }),
+};
+
+// Comments
+export const commentAPI = {
+  create: (data: { content_type: string; content_id: string; text: string; parent_id?: string }) =>
+    apiCall('/comments', { method: 'POST', body: data, auth: true }),
+  getComments: (contentType: string, contentId: string, page = 1) =>
+    apiCall(`/comments/${contentType}/${contentId}?page=${page}`),
+  delete: (commentId: string) => apiCall(`/comments/${commentId}`, { method: 'DELETE', auth: true }),
+  like: (commentId: string) => apiCall(`/comments/${commentId}/like`, { method: 'POST', auth: true }),
+};
+
+// Notifications
+export const notificationAPI = {
+  getAll: () => apiCall('/notifications', { auth: true }),
+  markAllRead: () => apiCall('/notifications/read', { method: 'PUT', auth: true }),
+  markRead: (notifId: string) => apiCall(`/notifications/${notifId}/read`, { method: 'PUT', auth: true }),
+  delete: (notifId: string) => apiCall(`/notifications/${notifId}`, { method: 'DELETE', auth: true }),
+};
+
+// Reading/Watch Progress
+export const progressAPI = {
+  update: (data: { series_id: string; episode_id: string; progress: number; completed?: boolean }) =>
+    apiCall('/progress', { method: 'POST', body: data, auth: true }),
+  getSeriesProgress: (seriesId: string) => apiCall(`/progress/${seriesId}`, { auth: true }),
+  getContinueWatching: () => apiCall('/continue-watching', { auth: true }),
 };
 
 // Seed (dev only)

@@ -76,6 +76,22 @@ class ReportCreate(BaseModel):
     reason: str  # copyright, inappropriate, spam, harassment, other
     details: Optional[str] = ""
 
+class CommentCreate(BaseModel):
+    content_type: str  # series, episode
+    content_id: str
+    text: str
+    parent_id: Optional[str] = None  # For replies
+
+class ProfileUpdate(BaseModel):
+    bio: Optional[str] = None
+    avatar_color: Optional[str] = None
+
+class ReadingProgressUpdate(BaseModel):
+    series_id: str
+    episode_id: str
+    progress: float  # 0-100 percentage
+    completed: bool = False
+
 class TipRequest(BaseModel):
     creator_id: str
     origin_url: str
@@ -355,6 +371,194 @@ async def get_reports(status: Optional[str] = None, user=Depends(get_current_use
     reports = await db.reports.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return {"reports": reports}
 
+# ============ COMMENTS SYSTEM ============
+@api_router.post("/comments")
+async def create_comment(data: CommentCreate, user=Depends(get_current_user)):
+    # Validate content exists
+    if data.content_type == "series":
+        content = await db.series.find_one({"id": data.content_id}, {"_id": 0})
+    elif data.content_type == "episode":
+        content = await db.series_episodes.find_one({"id": data.content_id}, {"_id": 0})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid content type")
+    
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    
+    if len(data.text.strip()) < 1:
+        raise HTTPException(status_code=400, detail="Comment cannot be empty")
+    
+    comment_id = str(uuid.uuid4())
+    comment_doc = {
+        "id": comment_id,
+        "content_type": data.content_type,
+        "content_id": data.content_id,
+        "user_id": user["id"],
+        "username": user["username"],
+        "avatar_color": user.get("avatar_color", "#00F0FF"),
+        "text": data.text.strip(),
+        "parent_id": data.parent_id,
+        "like_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.comments.insert_one(comment_doc)
+    
+    # Create notification for content owner
+    if data.content_type == "series":
+        owner_id = content.get("creator_id")
+    else:
+        owner_id = content.get("creator_id")
+    
+    if owner_id and owner_id != user["id"]:
+        await create_notification(owner_id, "comment", f"{user['username']} commented on your content", data.content_id)
+    
+    comment_doc.pop("_id", None)
+    return comment_doc
+
+@api_router.get("/comments/{content_type}/{content_id}")
+async def get_comments(content_type: str, content_id: str, page: int = 1):
+    skip = (page - 1) * 20
+    comments = await db.comments.find(
+        {"content_type": content_type, "content_id": content_id, "parent_id": None},
+        {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(20).to_list(20)
+    
+    # Get replies for each comment
+    for comment in comments:
+        replies = await db.comments.find(
+            {"parent_id": comment["id"]},
+            {"_id": 0}
+        ).sort("created_at", 1).limit(5).to_list(5)
+        comment["replies"] = replies
+        comment["reply_count"] = await db.comments.count_documents({"parent_id": comment["id"]})
+    
+    total = await db.comments.count_documents({"content_type": content_type, "content_id": content_id, "parent_id": None})
+    return {"comments": comments, "total": total, "page": page}
+
+@api_router.delete("/comments/{comment_id}")
+async def delete_comment(comment_id: str, user=Depends(get_current_user)):
+    comment = await db.comments.find_one({"id": comment_id}, {"_id": 0})
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment["user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not your comment")
+    await db.comments.delete_one({"id": comment_id})
+    # Also delete replies
+    await db.comments.delete_many({"parent_id": comment_id})
+    return {"message": "Comment deleted"}
+
+@api_router.post("/comments/{comment_id}/like")
+async def like_comment(comment_id: str, user=Depends(get_current_user)):
+    existing = await db.comment_likes.find_one({"comment_id": comment_id, "user_id": user["id"]})
+    if existing:
+        await db.comment_likes.delete_one({"comment_id": comment_id, "user_id": user["id"]})
+        await db.comments.update_one({"id": comment_id}, {"$inc": {"like_count": -1}})
+        return {"liked": False}
+    else:
+        await db.comment_likes.insert_one({"comment_id": comment_id, "user_id": user["id"], "created_at": datetime.now(timezone.utc).isoformat()})
+        await db.comments.update_one({"id": comment_id}, {"$inc": {"like_count": 1}})
+        return {"liked": True}
+
+# ============ NOTIFICATIONS SYSTEM ============
+async def create_notification(user_id: str, notif_type: str, message: str, related_id: str = None):
+    """Helper function to create notifications"""
+    notif_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "type": notif_type,  # comment, follow, tip, new_episode, like
+        "message": message,
+        "related_id": related_id,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notif_doc)
+
+@api_router.get("/notifications")
+async def get_notifications(user=Depends(get_current_user)):
+    notifications = await db.notifications.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    unread_count = await db.notifications.count_documents({"user_id": user["id"], "read": False})
+    return {"notifications": notifications, "unread_count": unread_count}
+
+@api_router.put("/notifications/read")
+async def mark_notifications_read(user=Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user["id"], "read": False}, {"$set": {"read": True}})
+    return {"message": "All notifications marked as read"}
+
+@api_router.put("/notifications/{notif_id}/read")
+async def mark_notification_read(notif_id: str, user=Depends(get_current_user)):
+    await db.notifications.update_one({"id": notif_id, "user_id": user["id"]}, {"$set": {"read": True}})
+    return {"message": "Notification marked as read"}
+
+@api_router.delete("/notifications/{notif_id}")
+async def delete_notification(notif_id: str, user=Depends(get_current_user)):
+    await db.notifications.delete_one({"id": notif_id, "user_id": user["id"]})
+    return {"message": "Notification deleted"}
+
+# ============ READING/WATCH PROGRESS ============
+@api_router.post("/progress")
+async def update_progress(data: ReadingProgressUpdate, user=Depends(get_current_user)):
+    await db.reading_progress.update_one(
+        {"user_id": user["id"], "series_id": data.series_id, "episode_id": data.episode_id},
+        {"$set": {
+            "user_id": user["id"],
+            "series_id": data.series_id,
+            "episode_id": data.episode_id,
+            "progress": data.progress,
+            "completed": data.completed,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }},
+        upsert=True
+    )
+    return {"message": "Progress saved"}
+
+@api_router.get("/progress/{series_id}")
+async def get_series_progress(series_id: str, user=Depends(get_current_user)):
+    progress_list = await db.reading_progress.find(
+        {"user_id": user["id"], "series_id": series_id},
+        {"_id": 0}
+    ).to_list(100)
+    return {"progress": progress_list}
+
+@api_router.get("/continue-watching")
+async def get_continue_watching(user=Depends(get_current_user)):
+    # Get recent progress that's not completed
+    progress_list = await db.reading_progress.find(
+        {"user_id": user["id"], "completed": False, "progress": {"$gt": 0}},
+        {"_id": 0}
+    ).sort("updated_at", -1).limit(10).to_list(10)
+    
+    # Enrich with series/episode data
+    result = []
+    for p in progress_list:
+        series = await db.series.find_one({"id": p["series_id"]}, {"_id": 0})
+        episode = await db.series_episodes.find_one({"id": p["episode_id"]}, {"_id": 0})
+        if series and episode:
+            result.append({
+                "series": series,
+                "episode": episode,
+                "progress": p["progress"],
+                "updated_at": p["updated_at"]
+            })
+    return {"items": result}
+
+# ============ PROFILE MANAGEMENT ============
+@api_router.put("/profile")
+async def update_profile_full(data: ProfileUpdate, user=Depends(get_current_user)):
+    update_data = {}
+    if data.bio is not None:
+        update_data["bio"] = data.bio[:500]  # Limit bio length
+    if data.avatar_color is not None:
+        update_data["avatar_color"] = data.avatar_color
+    
+    if update_data:
+        await db.users.update_one({"id": user["id"]}, {"$set": update_data})
+    
+    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return updated_user
+
 # ============ CREATOR PROFILE ============
 @api_router.get("/creators/{user_id}")
 async def get_creator_profile(user_id: str):
@@ -380,6 +584,8 @@ async def follow_creator(creator_id: str, user=Depends(get_current_user)):
     await db.follows.insert_one({"follower_id": user["id"], "following_id": creator_id, "created_at": datetime.now(timezone.utc).isoformat()})
     await db.users.update_one({"id": creator_id}, {"$inc": {"follower_count": 1}})
     await db.users.update_one({"id": user["id"]}, {"$inc": {"following_count": 1}})
+    # Create notification for the creator
+    await create_notification(creator_id, "follow", f"{user['username']} started following you", user["id"])
     return {"message": "Followed"}
 
 @api_router.delete("/follow/{creator_id}")
