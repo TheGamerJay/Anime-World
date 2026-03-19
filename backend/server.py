@@ -155,6 +155,41 @@ async def become_creator(user=Depends(get_current_user)):
     await db.users.update_one({"id": user["id"]}, {"$set": {"is_creator": True}})
     return {"message": "You are now a creator!"}
 
+@api_router.post("/auth/forgot-password")
+async def forgot_password(email: str):
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        # Don't reveal if email exists
+        return {"message": "If an account exists with this email, you will receive a password reset link"}
+    # In production, send email with reset token
+    # For now, we'll generate a reset token and store it
+    reset_token = str(uuid.uuid4())
+    await db.password_resets.update_one(
+        {"email": email},
+        {"$set": {"email": email, "token": reset_token, "created_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    # In production: send email with reset link
+    return {"message": "If an account exists with this email, you will receive a password reset link", "reset_token": reset_token}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(token: str, new_password: str):
+    reset_doc = await db.password_resets.find_one({"token": token}, {"_id": 0})
+    if not reset_doc:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    # Check if token is still valid (24 hours)
+    created = datetime.fromisoformat(reset_doc["created_at"].replace("Z", "+00:00"))
+    if datetime.now(timezone.utc) - created > timedelta(hours=24):
+        await db.password_resets.delete_one({"token": token})
+        raise HTTPException(status_code=400, detail="Reset token expired")
+    # Update password
+    await db.users.update_one(
+        {"email": reset_doc["email"]},
+        {"$set": {"password_hash": hash_password(new_password)}}
+    )
+    await db.password_resets.delete_one({"token": token})
+    return {"message": "Password reset successfully"}
+
 # ============ SERIES ROUTES ============
 @api_router.post("/series")
 async def create_series(data: SeriesCreate, user=Depends(get_current_user)):
