@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Stripe setup
-from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+
 
 # ============ MODELS ============
 class UserRegister(BaseModel):
@@ -187,17 +187,13 @@ async def become_creator(user=Depends(get_current_user)):
 async def forgot_password(email: str):
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user:
-        # Don't reveal if email exists
         return {"message": "If an account exists with this email, you will receive a password reset link"}
-    # In production, send email with reset token
-    # For now, we'll generate a reset token and store it
     reset_token = str(uuid.uuid4())
     await db.password_resets.update_one(
         {"email": email},
         {"$set": {"email": email, "token": reset_token, "created_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True
     )
-    # In production: send email with reset link
     return {"message": "If an account exists with this email, you will receive a password reset link", "reset_token": reset_token}
 
 @api_router.post("/auth/reset-password")
@@ -205,12 +201,10 @@ async def reset_password(token: str, new_password: str):
     reset_doc = await db.password_resets.find_one({"token": token}, {"_id": 0})
     if not reset_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    # Check if token is still valid (24 hours)
     created = datetime.fromisoformat(reset_doc["created_at"].replace("Z", "+00:00"))
     if datetime.now(timezone.utc) - created > timedelta(hours=24):
         await db.password_resets.delete_one({"token": token})
         raise HTTPException(status_code=400, detail="Reset token expired")
-    # Update password
     await db.users.update_one(
         {"email": reset_doc["email"]},
         {"$set": {"password_hash": hash_password(new_password)}}
@@ -224,10 +218,7 @@ async def create_series(data: SeriesCreate, user=Depends(get_current_user)):
     if not user.get("is_creator"):
         raise HTTPException(status_code=403, detail="You must be a creator to upload")
     
-    # Handle custom genre
     final_genre = data.custom_genre if data.genre == "Custom" and data.custom_genre else data.genre
-    
-    # Validate content type
     valid_content_types = ["series", "novel", "movie"]
     content_type = data.content_type if data.content_type in valid_content_types else "series"
     
@@ -291,17 +282,16 @@ async def create_episode(data: EpisodeCreate, user=Depends(get_current_user)):
     if not series:
         raise HTTPException(status_code=404, detail="Series not found or not yours")
     
-    # Determine content label based on series type
     content_type = series.get("content_type", "series")
     
     ep_id = str(uuid.uuid4())
     ep_doc = {
         "id": ep_id, "series_id": data.series_id, "creator_id": user["id"],
         "title": data.title, "description": data.description,
-        "episode_number": data.episode_number, 
+        "episode_number": data.episode_number,
         "video_url": data.video_url or "",
-        "content_text": data.content_text or "",  # For novel chapters
-        "arc_name": data.arc_name,  # Arc grouping
+        "content_text": data.content_text or "",
+        "arc_name": data.arc_name,
         "thumbnail_base64": data.thumbnail_base64 or series.get("thumbnail_base64"),
         "is_premium": data.is_premium, "view_count": 0, "like_count": 0,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -316,7 +306,6 @@ async def get_episode(episode_id: str):
     ep = await db.series_episodes.find_one({"id": episode_id}, {"_id": 0})
     if not ep:
         raise HTTPException(status_code=404, detail="Episode not found")
-    # Increment view
     await db.series_episodes.update_one({"id": episode_id}, {"$inc": {"view_count": 1}})
     await db.series.update_one({"id": ep["series_id"]}, {"$inc": {"view_count": 1}})
     return ep
@@ -333,7 +322,6 @@ async def delete_episode(episode_id: str, user=Depends(get_current_user)):
 # ============ REPORT SYSTEM ============
 @api_router.post("/reports")
 async def create_report(data: ReportCreate, user=Depends(get_current_user)):
-    # Validate content exists
     if data.content_type == "series":
         content = await db.series.find_one({"id": data.content_id}, {"_id": 0})
     elif data.content_type == "episode":
@@ -357,7 +345,7 @@ async def create_report(data: ReportCreate, user=Depends(get_current_user)):
         "content_creator_id": content.get("creator_id") or content.get("id"),
         "reason": data.reason,
         "details": data.details,
-        "status": "pending",  # pending, reviewed, resolved, dismissed
+        "status": "pending",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.reports.insert_one(report_doc)
@@ -366,7 +354,6 @@ async def create_report(data: ReportCreate, user=Depends(get_current_user)):
 
 @api_router.get("/reports")
 async def get_reports(status: Optional[str] = None, user=Depends(get_current_user)):
-    # For now, creators can see reports against their content
     query = {"content_creator_id": user["id"]}
     if status:
         query["status"] = status
@@ -376,7 +363,6 @@ async def get_reports(status: Optional[str] = None, user=Depends(get_current_use
 # ============ COMMENTS SYSTEM ============
 @api_router.post("/comments")
 async def create_comment(data: CommentCreate, user=Depends(get_current_user)):
-    # Validate content exists
     if data.content_type == "series":
         content = await db.series.find_one({"id": data.content_id}, {"_id": 0})
     elif data.content_type == "episode":
@@ -405,11 +391,7 @@ async def create_comment(data: CommentCreate, user=Depends(get_current_user)):
     }
     await db.comments.insert_one(comment_doc)
     
-    # Create notification for content owner
-    if data.content_type == "series":
-        owner_id = content.get("creator_id")
-    else:
-        owner_id = content.get("creator_id")
+    owner_id = content.get("creator_id")
     
     if owner_id and owner_id != user["id"]:
         await create_notification(owner_id, "comment", f"{user['username']} commented on your content", data.content_id)
@@ -425,7 +407,6 @@ async def get_comments(content_type: str, content_id: str, page: int = 1):
         {"_id": 0}
     ).sort("created_at", -1).skip(skip).limit(20).to_list(20)
     
-    # Get replies for each comment
     for comment in comments:
         replies = await db.comments.find(
             {"parent_id": comment["id"]},
@@ -445,7 +426,6 @@ async def delete_comment(comment_id: str, user=Depends(get_current_user)):
     if comment["user_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Not your comment")
     await db.comments.delete_one({"id": comment_id})
-    # Also delete replies
     await db.comments.delete_many({"parent_id": comment_id})
     return {"message": "Comment deleted"}
 
@@ -463,11 +443,10 @@ async def like_comment(comment_id: str, user=Depends(get_current_user)):
 
 # ============ NOTIFICATIONS SYSTEM ============
 async def create_notification(user_id: str, notif_type: str, message: str, related_id: str = None):
-    """Helper function to create notifications"""
     notif_doc = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
-        "type": notif_type,  # comment, follow, tip, new_episode, like
+        "type": notif_type,
         "message": message,
         "related_id": related_id,
         "read": False,
@@ -526,13 +505,11 @@ async def get_series_progress(series_id: str, user=Depends(get_current_user)):
 
 @api_router.get("/continue-watching")
 async def get_continue_watching(user=Depends(get_current_user)):
-    # Get recent progress that's not completed
     progress_list = await db.reading_progress.find(
         {"user_id": user["id"], "completed": False, "progress": {"$gt": 0}},
         {"_id": 0}
     ).sort("updated_at", -1).limit(10).to_list(10)
     
-    # Enrich with series/episode data
     result = []
     for p in progress_list:
         series = await db.series.find_one({"id": p["series_id"]}, {"_id": 0})
@@ -551,7 +528,7 @@ async def get_continue_watching(user=Depends(get_current_user)):
 async def update_profile_full(data: ProfileUpdate, user=Depends(get_current_user)):
     update_data = {}
     if data.bio is not None:
-        update_data["bio"] = data.bio[:500]  # Limit bio length
+        update_data["bio"] = data.bio[:500]
     if data.avatar_color is not None:
         update_data["avatar_color"] = data.avatar_color
     
@@ -579,8 +556,7 @@ async def update_profile(bio: str = "", avatar_color: str = "#00F0FF", user=Depe
 UPLOAD_DIR = ROOT_DIR / "uploads" / "avatars"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# Max file size: 20MB (to accommodate 15MB+ files)
-MAX_AVATAR_SIZE = 20 * 1024 * 1024  # 20MB
+MAX_AVATAR_SIZE = 20 * 1024 * 1024
 
 ALLOWED_AVATAR_TYPES = {
     "image/jpeg": ("image", ".jpg"),
@@ -594,29 +570,23 @@ ALLOWED_AVATAR_TYPES = {
 
 @api_router.post("/profile/avatar")
 async def upload_avatar(file: UploadFile = File(...), user=Depends(get_current_user)):
-    """Upload profile picture (image, GIF, or video) - max 20MB"""
-    
-    # Validate content type
     content_type = file.content_type or ""
     if content_type not in ALLOWED_AVATAR_TYPES:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Unsupported file type: {content_type}. Allowed: JPEG, PNG, WebP, GIF, MP4, MOV, WebM"
         )
     
     avatar_type, extension = ALLOWED_AVATAR_TYPES[content_type]
     
-    # Read file and check size
     contents = await file.read()
     if len(contents) > MAX_AVATAR_SIZE:
         raise HTTPException(status_code=400, detail=f"File too large. Maximum size is 20MB")
     
-    # Generate unique filename
     file_id = str(uuid.uuid4())
     filename = f"{user['id']}_{file_id}{extension}"
     file_path = UPLOAD_DIR / filename
     
-    # Delete old avatar file if exists
     old_avatar = user.get("avatar_url")
     if old_avatar and old_avatar.startswith("/api/uploads/avatars/"):
         old_filename = old_avatar.split("/")[-1]
@@ -624,14 +594,12 @@ async def upload_avatar(file: UploadFile = File(...), user=Depends(get_current_u
         if old_path.exists():
             old_path.unlink()
     
-    # Save new file
     with open(file_path, "wb") as f:
         f.write(contents)
     
-    # Update user profile
     avatar_url = f"/api/uploads/avatars/{filename}"
     await db.users.update_one(
-        {"id": user["id"]}, 
+        {"id": user["id"]},
         {"$set": {"avatar_url": avatar_url, "avatar_type": avatar_type}}
     )
     
@@ -645,7 +613,6 @@ async def upload_avatar(file: UploadFile = File(...), user=Depends(get_current_u
 
 @api_router.delete("/profile/avatar")
 async def delete_avatar(user=Depends(get_current_user)):
-    """Remove profile picture"""
     old_avatar = user.get("avatar_url")
     if old_avatar and old_avatar.startswith("/api/uploads/avatars/"):
         old_filename = old_avatar.split("/")[-1]
@@ -654,19 +621,17 @@ async def delete_avatar(user=Depends(get_current_user)):
             old_path.unlink()
     
     await db.users.update_one(
-        {"id": user["id"]}, 
+        {"id": user["id"]},
         {"$set": {"avatar_url": None, "avatar_type": None}}
     )
     return {"message": "Avatar removed"}
 
-# Serve uploaded avatar files
 @api_router.get("/uploads/avatars/{filename}")
 async def get_avatar_file(filename: str):
     file_path = UPLOAD_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     
-    # Determine content type
     ext = file_path.suffix.lower()
     content_types = {
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
@@ -689,7 +654,6 @@ async def follow_creator(creator_id: str, user=Depends(get_current_user)):
     await db.follows.insert_one({"follower_id": user["id"], "following_id": creator_id, "created_at": datetime.now(timezone.utc).isoformat()})
     await db.users.update_one({"id": creator_id}, {"$inc": {"follower_count": 1}})
     await db.users.update_one({"id": user["id"]}, {"$inc": {"following_count": 1}})
-    # Create notification for the creator
     await create_notification(creator_id, "follow", f"{user['username']} started following you", user["id"])
     return {"message": "Followed"}
 
@@ -895,24 +859,20 @@ async def get_creator_analytics(user=Depends(get_current_user)):
     if not user.get("is_creator"):
         raise HTTPException(status_code=403, detail="Not a creator")
     
-    # Get all paid transactions where this user is the creator
     all_transactions = await db.payment_transactions.find(
         {"creator_id": user["id"], "payment_status": "paid"}, {"_id": 0}
     ).sort("created_at", -1).to_list(500)
     
-    # Calculate revenue breakdown
     tips_gross = sum(t["amount"] for t in all_transactions if t.get("type") == "tip")
     channel_subs_gross = sum(t["amount"] for t in all_transactions if t.get("type") == "channel_sub")
     total_gross = tips_gross + channel_subs_gross
     platform_fee = total_gross * PLATFORM_CUT
     total_net = total_gross - platform_fee
     
-    # Get unique supporters
     supporter_ids = list(set(t.get("user_id") for t in all_transactions if t.get("user_id")))
     supporters = await db.users.find({"id": {"$in": supporter_ids}}, {"_id": 0, "password_hash": 0}).to_list(100)
     supporter_map = {s["id"]: s for s in supporters}
     
-    # Group transactions by supporter
     supporter_totals = {}
     for t in all_transactions:
         uid = t.get("user_id")
@@ -926,7 +886,6 @@ async def get_creator_analytics(user=Depends(get_current_user)):
             elif t.get("type") == "channel_sub":
                 supporter_totals[uid]["subs"] += t["amount"]
     
-    # Build top supporters list
     top_supporters = []
     for uid, stats in sorted(supporter_totals.items(), key=lambda x: x[1]["total"], reverse=True)[:20]:
         supporter_info = supporter_map.get(uid, {})
@@ -940,7 +899,6 @@ async def get_creator_analytics(user=Depends(get_current_user)):
             "transaction_count": stats["count"]
         })
     
-    # Transaction history with usernames
     recent_transactions = []
     for t in all_transactions[:50]:
         supporter_info = supporter_map.get(t.get("user_id"), {})
@@ -953,12 +911,10 @@ async def get_creator_analytics(user=Depends(get_current_user)):
             "net_amount": t["amount"] * (1 - PLATFORM_CUT)
         })
     
-    # Get series stats
     series_list = await db.series.find({"creator_id": user["id"]}, {"_id": 0}).to_list(50)
     total_views = sum(s.get("view_count", 0) for s in series_list)
     total_likes = sum(s.get("like_count", 0) for s in series_list)
     
-    # Monthly breakdown (last 6 months)
     from datetime import timedelta
     monthly_data = []
     now = datetime.now(timezone.utc)
@@ -1000,23 +956,19 @@ async def get_creator_analytics(user=Depends(get_current_user)):
 # ============ FAN ANALYTICS DASHBOARD ============
 @api_router.get("/analytics/fan")
 async def get_fan_analytics(user=Depends(get_current_user)):
-    # Get all paid transactions where this user is the payer
     all_transactions = await db.payment_transactions.find(
         {"user_id": user["id"], "payment_status": "paid"}, {"_id": 0}
     ).sort("created_at", -1).to_list(500)
     
-    # Calculate spending breakdown
     tips_total = sum(t["amount"] for t in all_transactions if t.get("type") == "tip")
     premium_total = sum(t["amount"] for t in all_transactions if t.get("type") == "premium")
     channel_subs_total = sum(t["amount"] for t in all_transactions if t.get("type") == "channel_sub")
     total_spent = tips_total + premium_total + channel_subs_total
     
-    # Get unique creators supported
     creator_ids = list(set(t.get("creator_id") for t in all_transactions if t.get("creator_id")))
     creators = await db.users.find({"id": {"$in": creator_ids}}, {"_id": 0, "password_hash": 0}).to_list(100)
     creator_map = {c["id"]: c for c in creators}
     
-    # Group transactions by creator
     creator_totals = {}
     for t in all_transactions:
         cid = t.get("creator_id")
@@ -1032,7 +984,6 @@ async def get_fan_analytics(user=Depends(get_current_user)):
             if t.get("created_at", "") > creator_totals[cid]["last_date"]:
                 creator_totals[cid]["last_date"] = t.get("created_at", "")
     
-    # Build supported creators list
     supported_creators = []
     for cid, stats in sorted(creator_totals.items(), key=lambda x: x[1]["total"], reverse=True):
         creator_info = creator_map.get(cid, {})
@@ -1048,7 +999,6 @@ async def get_fan_analytics(user=Depends(get_current_user)):
             "last_support_date": stats["last_date"]
         })
     
-    # Transaction history with creator info
     recent_transactions = []
     for t in all_transactions[:50]:
         creator_info = creator_map.get(t.get("creator_id"), {})
@@ -1058,7 +1008,6 @@ async def get_fan_analytics(user=Depends(get_current_user)):
             "creator_avatar_color": creator_info.get("avatar_color", "#00F0FF"),
         })
     
-    # Monthly spending (last 6 months)
     from datetime import timedelta
     monthly_data = []
     now = datetime.now(timezone.utc)
@@ -1075,7 +1024,6 @@ async def get_fan_analytics(user=Depends(get_current_user)):
         })
     monthly_data.reverse()
     
-    # Get following list
     following = await db.follows.find({"follower_id": user["id"]}, {"_id": 0}).to_list(100)
     following_ids = [f["following_id"] for f in following]
     
@@ -1102,7 +1050,6 @@ async def seed_data():
     if existing > 0:
         return {"message": "Data already seeded"}
 
-    # Create demo creators
     creators = [
         {"id": str(uuid.uuid4()), "username": "SakuraStudio", "email": "sakura@demo.com", "password_hash": hash_password("demo123"), "avatar_color": "#FF0099", "bio": "Independent anime studio creating original stories", "is_creator": True, "is_premium": False, "follower_count": 1240, "following_count": 5, "total_earnings": 0.0, "balance": 0.0, "created_at": datetime.now(timezone.utc).isoformat()},
         {"id": str(uuid.uuid4()), "username": "NeonDreams", "email": "neon@demo.com", "password_hash": hash_password("demo123"), "avatar_color": "#00F0FF", "bio": "Cyberpunk anime creator | New episodes every week", "is_creator": True, "is_premium": False, "follower_count": 890, "following_count": 12, "total_earnings": 0.0, "balance": 0.0, "created_at": datetime.now(timezone.utc).isoformat()},
@@ -1112,7 +1059,6 @@ async def seed_data():
     for c in creators:
         await db.users.update_one({"email": c["email"]}, {"$set": c}, upsert=True)
 
-    # Create demo series
     demo_series = [
         {"id": str(uuid.uuid4()), "creator_id": creators[0]["id"], "creator_name": "SakuraStudio", "creator_avatar_color": "#FF0099", "title": "Crimson Petals", "description": "A young warrior discovers she holds the power of the ancient sakura spirits. As dark forces threaten her village, she must master her abilities before it's too late.", "genre": "Fantasy", "tags": ["fantasy", "action", "magic"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 6, "view_count": 15600, "like_count": 890, "subscriber_count": 340, "is_featured": True, "status": "ongoing", "created_at": "2026-01-15T10:00:00+00:00"},
         {"id": str(uuid.uuid4()), "creator_id": creators[1]["id"], "creator_name": "NeonDreams", "creator_avatar_color": "#00F0FF", "title": "Circuit Zero", "description": "In Neo-Tokyo 2099, a hacker discovers a conspiracy that could destroy the boundary between the digital and physical worlds. Jack in or log out forever.", "genre": "Sci-Fi", "tags": ["cyberpunk", "sci-fi", "thriller"], "thumbnail_base64": None, "cover_base64": None, "episode_count": 4, "view_count": 12300, "like_count": 720, "subscriber_count": 210, "is_featured": True, "status": "ongoing", "created_at": "2026-02-01T10:00:00+00:00"},
@@ -1141,6 +1087,7 @@ async def shutdown_db_client():
 FRONTEND_DIST = ROOT_DIR.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIST)), name="static")
+
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         file_path = FRONTEND_DIST / full_path
