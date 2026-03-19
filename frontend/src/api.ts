@@ -26,7 +26,7 @@ async function apiCall(endpoint: string, options: RequestOptions = {}) {
     config.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${BACKEND_URL}/api${endpoint}`, config);
+  const res = await fetch(`${BACKEND_URL}/api/v1${endpoint}`, config);
   const data = await res.json();
 
   if (!res.ok) {
@@ -145,7 +145,7 @@ export const profileAPI = {
       name: fileName,
     } as any);
     
-    const res = await fetch(`${BACKEND_URL}/api/profile/avatar`, {
+    const res = await fetch(`${BACKEND_URL}/api/v1/profile/avatar`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
