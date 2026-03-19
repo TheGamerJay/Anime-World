@@ -115,7 +115,6 @@ export default function ProfileScreen() {
 
         {/* App Menu */}
         <View style={styles.menuSection}>
-          <MenuItem icon="swap-horizontal-outline" label="Switch Profile" onPress={() => router.push('/switch-profile')} />
           <MenuItem icon="time-outline" label="Watch History" onPress={() => router.push('/history')} />
           <MenuItem icon="settings-outline" label="Settings" onPress={() => router.push('/settings')} isLast />
         </View>
