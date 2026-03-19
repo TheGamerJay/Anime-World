@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,7 @@ import { profilesAPI } from '../../src/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const [activeProfile, setActiveProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -33,6 +33,19 @@ export default function ProfileScreen() {
       { text: 'Sign Out', style: 'destructive', onPress: logout },
     ]);
   };
+
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.pageTitle}>Profile</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.brand.cyan} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!user) {
     return (

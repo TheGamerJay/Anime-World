@@ -16,7 +16,7 @@ const CARD_WIDTH = (SCREEN_WIDTH - Spacing.md * 2 - 12) / 2;
 
 export default function WatchlistScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,6 +46,19 @@ export default function WatchlistScreen() {
       console.error('Failed to remove:', err);
     }
   };
+
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={styles.pageTitle}>My List</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.brand.cyan} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!user) {
     return (

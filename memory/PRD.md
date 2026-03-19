@@ -37,10 +37,14 @@ Anime World is a mobile anime streaming platform clone built with React Native E
 - **Home**: Hero banner, Trending Now, Most Popular, Coming Soon sections
 - **Browse**: Search bar, genre chips, 2-column grid results
 - **My List**: Watchlist grid with remove functionality
-- **Profile**: User info, menu items, sign out
+- **Profile**: User info, switch profile, settings, watch history, legal pages, sign out
+- **Switch Profile**: Multi-profile selector (up to 5), create/delete/switch profiles with custom colors
+- **Settings**: Playback (autoplay, subtitles), video quality, language, notifications, data saver, mature content, clear cache/history
+- **Watch History**: List of watched episodes with progress bars
 - **Anime Detail**: Hero image, synopsis, episodes/details tabs, watchlist toggle
 - **Episode Player**: Simulated player with progress, like/share/download buttons
 - **Auth**: Login/register with form validation
+- **7 Legal Pages**: Privacy Policy, Terms of Service, Disclaimer, DMCA/Copyright, Cookie Policy, About Us, Contact Us
 
 ### Design
 - Cotton candy cyberpunk theme (Cyan #00F0FF + Pink #FF0099)
