@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { Video, ResizeMode } from 'expo-av';
 import { Colors, Spacing, Radius } from '../../src/theme';
 import { useAuth } from '../../src/AuthContext';
+
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 function formatMoney(amount: number): string {
   return '$' + amount.toFixed(2);
@@ -93,11 +96,32 @@ export default function ProfileScreen() {
 
         {/* Avatar + Info */}
         <View style={styles.profileSection}>
-          <LinearGradient colors={[profileColor, profileColor + '60']} style={styles.avatarGradient}>
-            <View style={styles.avatarInner}>
-              <Text style={[styles.avatarLetter, { color: profileColor }]}>{initial}</Text>
+          {user.avatar_url ? (
+            <View style={styles.avatarMediaContainer}>
+              {user.avatar_type === 'video' ? (
+                <Video
+                  source={{ uri: `${BACKEND_URL}${user.avatar_url}` }}
+                  style={styles.avatarMedia}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay
+                  isLooping
+                  isMuted
+                />
+              ) : (
+                <Image
+                  source={{ uri: `${BACKEND_URL}${user.avatar_url}` }}
+                  style={styles.avatarMedia}
+                  resizeMode="cover"
+                />
+              )}
             </View>
-          </LinearGradient>
+          ) : (
+            <LinearGradient colors={[profileColor, profileColor + '60']} style={styles.avatarGradient}>
+              <View style={styles.avatarInner}>
+                <Text style={[styles.avatarLetter, { color: profileColor }]}>{initial}</Text>
+              </View>
+            </LinearGradient>
+          )}
           <View style={styles.nameRow}>
             <Text style={styles.username}>{user.username}</Text>
             {user.is_creator && (
@@ -244,6 +268,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   avatarLetter: { fontSize: 32, fontWeight: '800' },
+  avatarMediaContainer: { 
+    width: 88, 
+    height: 88, 
+    borderRadius: 44, 
+    overflow: 'hidden', 
+    backgroundColor: Colors.bg.card,
+    borderWidth: 2,
+    borderColor: Colors.brand.cyan + '40',
+  },
+  avatarMedia: { width: '100%', height: '100%' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: Spacing.md },
   username: { fontSize: 22, fontWeight: '700', color: Colors.text.primary },
   creatorBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.brand.success + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },

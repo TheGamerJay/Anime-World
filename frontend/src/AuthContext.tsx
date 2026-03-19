@@ -7,6 +7,8 @@ export interface User {
   username: string;
   email: string;
   avatar_color: string;
+  avatar_url?: string;
+  avatar_type?: string;
   bio: string;
   is_creator: boolean;
   is_premium: boolean;

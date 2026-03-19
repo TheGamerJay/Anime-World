@@ -136,6 +136,29 @@ export const paymentsAPI = {
 export const profileAPI = {
   update: (data: { bio?: string; avatar_color?: string }) =>
     apiCall('/profile', { method: 'PUT', body: data, auth: true }),
+  uploadAvatar: async (fileUri: string, mimeType: string, fileName: string) => {
+    const token = await AsyncStorage.getItem('auth_token');
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      type: mimeType,
+      name: fileName,
+    } as any);
+    
+    const res = await fetch(`${BACKEND_URL}/api/profile/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Failed to upload avatar');
+    }
+    return data;
+  },
+  deleteAvatar: () => apiCall('/profile/avatar', { method: 'DELETE', auth: true }),
 };
 
 // Comments

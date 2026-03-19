@@ -85,6 +85,8 @@ class CommentCreate(BaseModel):
 class ProfileUpdate(BaseModel):
     bio: Optional[str] = None
     avatar_color: Optional[str] = None
+    avatar_url: Optional[str] = None
+    avatar_type: Optional[str] = None  # 'image', 'gif', 'video'
 
 class ReadingProgressUpdate(BaseModel):
     series_id: str
@@ -572,6 +574,109 @@ async def get_creator_profile(user_id: str):
 async def update_profile(bio: str = "", avatar_color: str = "#00F0FF", user=Depends(get_current_user)):
     await db.users.update_one({"id": user["id"]}, {"$set": {"bio": bio, "avatar_color": avatar_color}})
     return {"message": "Profile updated"}
+
+# ============ AVATAR UPLOAD ============
+UPLOAD_DIR = ROOT_DIR / "uploads" / "avatars"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Max file size: 20MB (to accommodate 15MB+ files)
+MAX_AVATAR_SIZE = 20 * 1024 * 1024  # 20MB
+
+ALLOWED_AVATAR_TYPES = {
+    "image/jpeg": ("image", ".jpg"),
+    "image/png": ("image", ".png"),
+    "image/webp": ("image", ".webp"),
+    "image/gif": ("gif", ".gif"),
+    "video/mp4": ("video", ".mp4"),
+    "video/quicktime": ("video", ".mov"),
+    "video/webm": ("video", ".webm"),
+}
+
+@api_router.post("/profile/avatar")
+async def upload_avatar(file: UploadFile = File(...), user=Depends(get_current_user)):
+    """Upload profile picture (image, GIF, or video) - max 20MB"""
+    
+    # Validate content type
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_AVATAR_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file type: {content_type}. Allowed: JPEG, PNG, WebP, GIF, MP4, MOV, WebM"
+        )
+    
+    avatar_type, extension = ALLOWED_AVATAR_TYPES[content_type]
+    
+    # Read file and check size
+    contents = await file.read()
+    if len(contents) > MAX_AVATAR_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large. Maximum size is 20MB")
+    
+    # Generate unique filename
+    file_id = str(uuid.uuid4())
+    filename = f"{user['id']}_{file_id}{extension}"
+    file_path = UPLOAD_DIR / filename
+    
+    # Delete old avatar file if exists
+    old_avatar = user.get("avatar_url")
+    if old_avatar and old_avatar.startswith("/api/uploads/avatars/"):
+        old_filename = old_avatar.split("/")[-1]
+        old_path = UPLOAD_DIR / old_filename
+        if old_path.exists():
+            old_path.unlink()
+    
+    # Save new file
+    with open(file_path, "wb") as f:
+        f.write(contents)
+    
+    # Update user profile
+    avatar_url = f"/api/uploads/avatars/{filename}"
+    await db.users.update_one(
+        {"id": user["id"]}, 
+        {"$set": {"avatar_url": avatar_url, "avatar_type": avatar_type}}
+    )
+    
+    updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return {
+        "message": "Avatar uploaded successfully",
+        "avatar_url": avatar_url,
+        "avatar_type": avatar_type,
+        "user": updated_user
+    }
+
+@api_router.delete("/profile/avatar")
+async def delete_avatar(user=Depends(get_current_user)):
+    """Remove profile picture"""
+    old_avatar = user.get("avatar_url")
+    if old_avatar and old_avatar.startswith("/api/uploads/avatars/"):
+        old_filename = old_avatar.split("/")[-1]
+        old_path = UPLOAD_DIR / old_filename
+        if old_path.exists():
+            old_path.unlink()
+    
+    await db.users.update_one(
+        {"id": user["id"]}, 
+        {"$set": {"avatar_url": None, "avatar_type": None}}
+    )
+    return {"message": "Avatar removed"}
+
+# Serve uploaded avatar files
+@api_router.get("/uploads/avatars/{filename}")
+async def get_avatar_file(filename: str):
+    file_path = UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    ext = file_path.suffix.lower()
+    content_types = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".webp": "image/webp",
+        ".gif": "image/gif", ".mp4": "video/mp4",
+        ".mov": "video/quicktime", ".webm": "video/webm",
+    }
+    media_type = content_types.get(ext, "application/octet-stream")
+    
+    return FileResponse(file_path, media_type=media_type)
 
 # ============ FOLLOW SYSTEM ============
 @api_router.post("/follow/{creator_id}")
