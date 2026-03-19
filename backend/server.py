@@ -32,7 +32,7 @@ JWT_EXPIRATION_HOURS = 72
 # Jikan API
 JIKAN_BASE_URL = "https://api.jikan.moe/v4"
 
-app = FastAPI(title="Anime Streamer API")
+app = FastAPI(title="Anime World API")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer(auto_error=False)
 
@@ -344,7 +344,7 @@ async def get_watch_history(user=Depends(get_current_user)):
 # ============ HEALTH ============
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "anime-streamer-api"}
+    return {"status": "healthy", "service": "anime-world-api"}
 
 
 # Include router and middleware

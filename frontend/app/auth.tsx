@@ -59,7 +59,7 @@ export default function AuthScreen() {
 
           {/* Logo */}
           <View style={styles.logoSection}>
-            <Text style={styles.logo}>ANIME<Text style={styles.logoPink}>ROLL</Text></Text>
+            <Text style={styles.logo}>ANIME<Text style={styles.logoPink}>WORLD</Text></Text>
             <Text style={styles.subtitle}>{isLogin ? 'Welcome back!' : 'Create your account'}</Text>
           </View>
 
@@ -114,7 +114,7 @@ export default function AuthScreen() {
                   secureTextEntry={!showPassword}
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.text.muted} />
+                  <Text style={styles.monkeyEmoji}>{showPassword ? '\u{1F648}' : '\u{1F649}'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -172,4 +172,5 @@ const styles = StyleSheet.create({
   toggleBtn: { alignItems: 'center', paddingVertical: 16 },
   toggleText: { fontSize: 14, color: Colors.text.secondary },
   toggleTextHighlight: { color: Colors.brand.cyan, fontWeight: '600' },
+  monkeyEmoji: { fontSize: 22 },
 });

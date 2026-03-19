@@ -150,7 +150,7 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.logo}>ANIME<Text style={styles.logoPink}>ROLL</Text></Text>
+          <Text style={styles.logo}>ANIME<Text style={styles.logoPink}>WORLD</Text></Text>
           {user ? (
             <View style={styles.userBadge}>
               <Ionicons name="person-circle" size={28} color={Colors.brand.cyan} />

@@ -30,7 +30,7 @@ export default function ProfileScreen() {
           <View style={styles.avatarPlaceholder}>
             <Ionicons name="person" size={48} color={Colors.text.muted} />
           </View>
-          <Text style={styles.emptyTitle}>Join AnimeRoll</Text>
+          <Text style={styles.emptyTitle}>Join Anime World</Text>
           <Text style={styles.emptySubtext}>Sign in to track your progress, save favorites, and more</Text>
           <TouchableOpacity testID="profile-login-btn" onPress={() => router.push('/auth')} style={styles.signInBtn}>
             <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signInGradient}>

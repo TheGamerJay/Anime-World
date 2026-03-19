@@ -1,7 +1,7 @@
-# AnimeRoll - Crunchyroll Clone PRD
+# Anime World - Crunchyroll Clone PRD
 
 ## Overview
-AnimeRoll is a mobile anime streaming platform clone built with React Native Expo and FastAPI, featuring a cotton candy (cyan & pink) cyberpunk theme.
+Anime World is a mobile anime streaming platform clone built with React Native Expo and FastAPI, featuring a cotton candy (cyan & pink) cyberpunk theme.
 
 ## Tech Stack
 - **Frontend**: React Native Expo (SDK 54), expo-router, expo-linear-gradient
