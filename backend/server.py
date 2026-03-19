@@ -341,6 +341,74 @@ async def get_watch_history(user=Depends(get_current_user)):
     return {"items": items}
 
 
+class ProfileCreate(BaseModel):
+    name: str
+    avatar_color: Optional[str] = None
+
+
+# ============ PROFILES ROUTES ============
+@api_router.get("/profiles")
+async def get_profiles(user=Depends(get_current_user)):
+    profiles = await db.profiles.find({"user_id": user["id"]}, {"_id": 0}).to_list(5)
+    if not profiles:
+        default_profile = {
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "name": user["username"],
+            "avatar_color": "#00F0FF",
+            "is_active": True,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.profiles.insert_one(default_profile)
+        default_profile.pop("_id", None)
+        profiles = [default_profile]
+    return {"profiles": profiles}
+
+
+@api_router.post("/profiles")
+async def create_profile(data: ProfileCreate, user=Depends(get_current_user)):
+    count = await db.profiles.count_documents({"user_id": user["id"]})
+    if count >= 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 profiles allowed")
+    profile = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "name": data.name,
+        "avatar_color": data.avatar_color or "#FF0099",
+        "is_active": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.profiles.insert_one(profile)
+    profile.pop("_id", None)
+    return profile
+
+
+@api_router.put("/profiles/{profile_id}/switch")
+async def switch_profile(profile_id: str, user=Depends(get_current_user)):
+    profile = await db.profiles.find_one({"id": profile_id, "user_id": user["id"]}, {"_id": 0})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    await db.profiles.update_many({"user_id": user["id"]}, {"$set": {"is_active": False}})
+    await db.profiles.update_one({"id": profile_id}, {"$set": {"is_active": True}})
+    return {"message": "Switched to profile", "profile": {**profile, "is_active": True}}
+
+
+@api_router.delete("/profiles/{profile_id}")
+async def delete_profile(profile_id: str, user=Depends(get_current_user)):
+    count = await db.profiles.count_documents({"user_id": user["id"]})
+    if count <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete the only profile")
+    result = await db.profiles.delete_one({"id": profile_id, "user_id": user["id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    active = await db.profiles.find_one({"user_id": user["id"], "is_active": True}, {"_id": 0})
+    if not active:
+        first = await db.profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+        if first:
+            await db.profiles.update_one({"id": first["id"]}, {"$set": {"is_active": True}})
+    return {"message": "Profile deleted"}
+
+
 # ============ HEALTH ============
 @api_router.get("/health")
 async def health_check():

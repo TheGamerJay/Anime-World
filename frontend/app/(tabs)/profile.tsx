@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
@@ -8,10 +8,24 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Colors, Spacing, Radius } from '../../src/theme';
 import { useAuth } from '../../src/AuthContext';
+import { profilesAPI } from '../../src/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [activeProfile, setActiveProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (user) loadActiveProfile();
+  }, [user]);
+
+  async function loadActiveProfile() {
+    try {
+      const res = await profilesAPI.getAll();
+      const active = (res.profiles || []).find((p: any) => p.is_active);
+      setActiveProfile(active || null);
+    } catch {}
+  }
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -40,7 +54,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Legal Section - visible even when signed out */}
           <View style={styles.legalSection}>
             <Text style={styles.legalSectionTitle}>Legal & Policies</Text>
             <View style={styles.menuSection}>
@@ -53,14 +66,15 @@ export default function ProfileScreen() {
               <MenuItem icon="mail-outline" label="Contact Us" onPress={() => router.push('/policies/contact')} isLast />
             </View>
           </View>
-
           <View style={{ height: 100 }} />
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  const initial = user.username.charAt(0).toUpperCase();
+  const profileColor = activeProfile?.avatar_color || Colors.brand.cyan;
+  const profileName = activeProfile?.name || user.username;
+  const initial = profileName.charAt(0).toUpperCase();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -71,19 +85,26 @@ export default function ProfileScreen() {
 
         {/* Avatar + Info */}
         <View style={styles.profileSection}>
-          <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} style={styles.avatarGradient}>
-            <View style={styles.avatarInner}>
-              <Text style={styles.avatarLetter}>{initial}</Text>
-            </View>
-          </LinearGradient>
-          <Text style={styles.username}>{user.username}</Text>
+          <TouchableOpacity testID="switch-profile-link" onPress={() => router.push('/switch-profile')} activeOpacity={0.8}>
+            <LinearGradient colors={[profileColor, profileColor + '80']} style={styles.avatarGradient}>
+              <View style={styles.avatarInner}>
+                <Text style={[styles.avatarLetter, { color: profileColor }]}>{initial}</Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+          <Text style={styles.username}>{profileName}</Text>
           <Text style={styles.email}>{user.email}</Text>
+          <TouchableOpacity testID="switch-profile-btn" onPress={() => router.push('/switch-profile')} style={styles.switchProfileBtn}>
+            <Ionicons name="swap-horizontal" size={16} color={Colors.brand.cyan} />
+            <Text style={styles.switchProfileText}>Switch Profile</Text>
+          </TouchableOpacity>
         </View>
 
         {/* App Menu */}
         <View style={styles.menuSection}>
-          <MenuItem icon="time-outline" label="Watch History" onPress={() => {}} />
-          <MenuItem icon="settings-outline" label="Settings" onPress={() => {}} isLast />
+          <MenuItem icon="swap-horizontal-outline" label="Switch Profile" onPress={() => router.push('/switch-profile')} />
+          <MenuItem icon="time-outline" label="Watch History" onPress={() => router.push('/history')} />
+          <MenuItem icon="settings-outline" label="Settings" onPress={() => router.push('/settings')} isLast />
         </View>
 
         {/* Legal & Policies */}
@@ -147,9 +168,11 @@ const styles = StyleSheet.create({
     flex: 1, borderRadius: 42, backgroundColor: Colors.bg.default,
     justifyContent: 'center', alignItems: 'center',
   },
-  avatarLetter: { fontSize: 32, fontWeight: '800', color: Colors.brand.cyan },
+  avatarLetter: { fontSize: 32, fontWeight: '800' },
   username: { fontSize: 22, fontWeight: '700', color: Colors.text.primary, marginTop: Spacing.md },
   email: { fontSize: 14, color: Colors.text.muted, marginTop: 4 },
+  switchProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.brand.cyanDim },
+  switchProfileText: { fontSize: 13, color: Colors.brand.cyan, fontWeight: '600' },
   legalSection: { marginTop: Spacing.lg },
   legalSectionTitle: { fontSize: 13, fontWeight: '600', color: Colors.text.muted, letterSpacing: 1, textTransform: 'uppercase', marginHorizontal: Spacing.md, marginBottom: Spacing.sm },
   menuSection: { marginHorizontal: Spacing.md, backgroundColor: Colors.bg.surface, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },

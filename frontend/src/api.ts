@@ -69,3 +69,11 @@ export const historyAPI = {
   update: (item: any) => apiCall('/history', { method: 'POST', body: item, auth: true }),
   getAll: () => apiCall('/history', { auth: true }),
 };
+
+// Profiles
+export const profilesAPI = {
+  getAll: () => apiCall('/profiles', { auth: true }),
+  create: (name: string, avatar_color: string) => apiCall('/profiles', { method: 'POST', body: { name, avatar_color }, auth: true }),
+  switchTo: (profileId: string) => apiCall(`/profiles/${profileId}/switch`, { method: 'PUT', auth: true }),
+  remove: (profileId: string) => apiCall(`/profiles/${profileId}`, { method: 'DELETE', auth: true }),
+};
