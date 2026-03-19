@@ -44,13 +44,13 @@ function HeroSection({ anime, onPress }: { anime: AnimeItem | null; onPress: () 
         <Text style={styles.heroTitle} numberOfLines={2}>{anime.title}</Text>
         <Text style={styles.heroSynopsis} numberOfLines={2}>{anime.synopsis || 'An exciting anime series awaits you!'}</Text>
         <View style={styles.heroActions}>
-          <TouchableOpacity testID="hero-watch-btn" style={styles.watchBtn}>
+          <TouchableOpacity testID="hero-watch-btn" onPress={onPress} style={styles.watchBtn}>
             <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.watchBtnGradient}>
               <Ionicons name="play" size={18} color="#000" />
               <Text style={styles.watchBtnText}>Watch Now</Text>
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity testID="hero-info-btn" style={styles.infoBtn}>
+          <TouchableOpacity testID="hero-info-btn" onPress={onPress} style={styles.infoBtn}>
             <Ionicons name="information-circle-outline" size={20} color={Colors.text.primary} />
             <Text style={styles.infoBtnText}>Details</Text>
           </TouchableOpacity>
