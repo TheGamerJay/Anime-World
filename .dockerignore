@@ -1,9 +1,59 @@
-node_modules
+# Version control
 .git
-.emergent
-test_reports
-tests
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+test_reports/
+tests/
+
+# Node / Frontend build artifacts (handled by multi-stage build)
+frontend/node_modules/
+frontend/.expo/
+frontend/dist/
+node_modules/
+
+# Environment files (never bake secrets into the image)
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+.emergent/
+
+# Docs
 *.md
+docs/
 design_guidelines.json
 test_result.md
-frontend/node_modules
+
+# CI
+.github/
+
+# Uploads (runtime data, not part of the image)
+backend/uploads/
