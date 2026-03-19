@@ -24,6 +24,15 @@ Anime World is a mobile anime streaming platform clone built with React Native E
 - [x] Genre-based filtering
 - [x] Pull-to-refresh on home screen
 
+### AdSense & Legal Pages (all accessible from Profile)
+- [x] Privacy Policy (GDPR + CCPA compliant, Google AdSense disclosure)
+- [x] Terms of Service (comprehensive with liability, indemnification, arbitration)
+- [x] Disclaimer (content, advertising, affiliate, fair use disclaimers)
+- [x] DMCA / Copyright Policy (takedown notices, counter-notifications, repeat infringers)
+- [x] Cookie Policy (essential, analytics, advertising cookies, Google AdSense cookies)
+- [x] About Us (mission, data sources, commitment)
+- [x] Contact Us (contact form with name, email, subject, message)
+
 ### Screens
 - **Home**: Hero banner, Trending Now, Most Popular, Coming Soon sections
 - **Browse**: Search bar, genre chips, 2-column grid results

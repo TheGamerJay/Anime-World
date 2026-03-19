@@ -26,18 +26,36 @@ export default function ProfileScreen() {
         <View style={styles.header}>
           <Text style={styles.pageTitle}>Profile</Text>
         </View>
-        <View style={styles.emptyContainer}>
-          <View style={styles.avatarPlaceholder}>
-            <Ionicons name="person" size={48} color={Colors.text.muted} />
+        <ScrollView contentContainerStyle={styles.signedOutContent}>
+          <View style={styles.emptyContainer}>
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={48} color={Colors.text.muted} />
+            </View>
+            <Text style={styles.emptyTitle}>Join Anime World</Text>
+            <Text style={styles.emptySubtext}>Sign in to track your progress, save favorites, and more</Text>
+            <TouchableOpacity testID="profile-login-btn" onPress={() => router.push('/auth')} style={styles.signInBtn}>
+              <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signInGradient}>
+                <Text style={styles.signInText}>Sign In</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.emptyTitle}>Join Anime World</Text>
-          <Text style={styles.emptySubtext}>Sign in to track your progress, save favorites, and more</Text>
-          <TouchableOpacity testID="profile-login-btn" onPress={() => router.push('/auth')} style={styles.signInBtn}>
-            <LinearGradient colors={[Colors.brand.cyan, Colors.brand.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signInGradient}>
-              <Text style={styles.signInText}>Sign In</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+
+          {/* Legal Section - visible even when signed out */}
+          <View style={styles.legalSection}>
+            <Text style={styles.legalSectionTitle}>Legal & Policies</Text>
+            <View style={styles.menuSection}>
+              <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push('/policies/privacy')} />
+              <MenuItem icon="reader-outline" label="Terms of Service" onPress={() => router.push('/policies/terms')} />
+              <MenuItem icon="alert-circle-outline" label="Disclaimer" onPress={() => router.push('/policies/disclaimer')} />
+              <MenuItem icon="shield-checkmark-outline" label="DMCA / Copyright" onPress={() => router.push('/policies/dmca')} />
+              <MenuItem icon="finger-print-outline" label="Cookie Policy" onPress={() => router.push('/policies/cookies')} />
+              <MenuItem icon="information-circle-outline" label="About Us" onPress={() => router.push('/policies/about')} />
+              <MenuItem icon="mail-outline" label="Contact Us" onPress={() => router.push('/policies/contact')} isLast />
+            </View>
+          </View>
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -62,12 +80,24 @@ export default function ProfileScreen() {
           <Text style={styles.email}>{user.email}</Text>
         </View>
 
-        {/* Menu Items */}
+        {/* App Menu */}
         <View style={styles.menuSection}>
           <MenuItem icon="time-outline" label="Watch History" onPress={() => {}} />
-          <MenuItem icon="settings-outline" label="Settings" onPress={() => {}} />
-          <MenuItem icon="information-circle-outline" label="About" onPress={() => {}} />
-          <MenuItem icon="help-circle-outline" label="Help & Support" onPress={() => {}} />
+          <MenuItem icon="settings-outline" label="Settings" onPress={() => {}} isLast />
+        </View>
+
+        {/* Legal & Policies */}
+        <View style={styles.legalSection}>
+          <Text style={styles.legalSectionTitle}>Legal & Policies</Text>
+          <View style={styles.menuSection}>
+            <MenuItem icon="document-text-outline" label="Privacy Policy" onPress={() => router.push('/policies/privacy')} />
+            <MenuItem icon="reader-outline" label="Terms of Service" onPress={() => router.push('/policies/terms')} />
+            <MenuItem icon="alert-circle-outline" label="Disclaimer" onPress={() => router.push('/policies/disclaimer')} />
+            <MenuItem icon="shield-checkmark-outline" label="DMCA / Copyright" onPress={() => router.push('/policies/dmca')} />
+            <MenuItem icon="finger-print-outline" label="Cookie Policy" onPress={() => router.push('/policies/cookies')} />
+            <MenuItem icon="information-circle-outline" label="About Us" onPress={() => router.push('/policies/about')} />
+            <MenuItem icon="mail-outline" label="Contact Us" onPress={() => router.push('/policies/contact')} isLast />
+          </View>
         </View>
 
         {/* Sign Out */}
@@ -82,9 +112,9 @@ export default function ProfileScreen() {
   );
 }
 
-function MenuItem({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
+function MenuItem({ icon, label, onPress, isLast = false }: { icon: string; label: string; onPress: () => void; isLast?: boolean }) {
   return (
-    <TouchableOpacity onPress={onPress} style={styles.menuItem} activeOpacity={0.7}>
+    <TouchableOpacity testID={`menu-${label.toLowerCase().replace(/\s+/g, '-')}`} onPress={onPress} style={[styles.menuItem, isLast && styles.menuItemLast]} activeOpacity={0.7}>
       <View style={styles.menuLeft}>
         <Ionicons name={icon as any} size={22} color={Colors.text.secondary} />
         <Text style={styles.menuLabel}>{label}</Text>
@@ -98,9 +128,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.default },
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
+  signedOutContent: { paddingBottom: 40 },
   header: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.md },
   pageTitle: { fontSize: 28, fontWeight: '800', color: Colors.text.primary },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingHorizontal: 40, marginTop: 80 },
+  emptyContainer: { alignItems: 'center', gap: 12, paddingHorizontal: 40, marginTop: 40 },
   avatarPlaceholder: {
     width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.bg.card,
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: Colors.border,
@@ -119,12 +150,15 @@ const styles = StyleSheet.create({
   avatarLetter: { fontSize: 32, fontWeight: '800', color: Colors.brand.cyan },
   username: { fontSize: 22, fontWeight: '700', color: Colors.text.primary, marginTop: Spacing.md },
   email: { fontSize: 14, color: Colors.text.muted, marginTop: 4 },
-  menuSection: { marginTop: Spacing.lg, marginHorizontal: Spacing.md, backgroundColor: Colors.bg.surface, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
+  legalSection: { marginTop: Spacing.lg },
+  legalSectionTitle: { fontSize: 13, fontWeight: '600', color: Colors.text.muted, letterSpacing: 1, textTransform: 'uppercase', marginHorizontal: Spacing.md, marginBottom: Spacing.sm },
+  menuSection: { marginHorizontal: Spacing.md, backgroundColor: Colors.bg.surface, borderRadius: Radius.md, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
   menuItem: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.md, paddingVertical: 16,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
+  menuItemLast: { borderBottomWidth: 0 },
   menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   menuLabel: { fontSize: 16, color: Colors.text.primary, fontWeight: '500' },
   logoutBtn: {
