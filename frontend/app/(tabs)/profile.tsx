@@ -83,6 +83,12 @@ export default function ProfileScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.pageTitle}>Profile</Text>
+          <TouchableOpacity 
+            onPress={() => router.push('/notifications')} 
+            style={styles.notifBtn}
+          >
+            <Ionicons name="notifications-outline" size={24} color={Colors.text.primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Avatar + Info */}
@@ -102,6 +108,15 @@ export default function ProfileScreen() {
             )}
           </View>
           <Text style={styles.email}>{user.email}</Text>
+          
+          {/* Edit Profile Button */}
+          <TouchableOpacity 
+            onPress={() => router.push('/edit-profile')} 
+            style={styles.editProfileBtn}
+          >
+            <Ionicons name="create-outline" size={18} color={Colors.brand.cyan} />
+            <Text style={styles.editProfileText}>Edit Profile</Text>
+          </TouchableOpacity>
           
           {/* Stats */}
           <View style={styles.statsRow}>
@@ -141,6 +156,7 @@ export default function ProfileScreen() {
 
         {/* Analytics Menu */}
         <View style={styles.menuSection}>
+          <MenuItem icon="notifications" label="Notifications" onPress={() => router.push('/notifications')} />
           <MenuItem icon="heart" label="My Support History" onPress={() => router.push('/fan-dashboard')} />
           {user.is_creator && (
             <MenuItem icon="analytics" label="Creator Analytics" onPress={() => router.push('/creator-dashboard')} />
@@ -192,8 +208,25 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   scrollContent: { paddingBottom: 40 },
   signedOutContent: { paddingBottom: 40 },
-  header: { paddingHorizontal: Spacing.md, paddingTop: Spacing.sm, paddingBottom: Spacing.md },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md, 
+    paddingTop: Spacing.sm, 
+    paddingBottom: Spacing.md 
+  },
   pageTitle: { fontSize: 28, fontWeight: '800', color: Colors.text.primary },
+  notifBtn: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
+    backgroundColor: Colors.bg.surface,
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
   emptyContainer: { alignItems: 'center', gap: 12, paddingHorizontal: 40, marginTop: 40 },
   avatarPlaceholder: {
     width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.bg.card,
@@ -216,6 +249,19 @@ const styles = StyleSheet.create({
   creatorBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.brand.success + '20', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
   creatorBadgeText: { color: Colors.brand.success, fontSize: 11, fontWeight: '700' },
   email: { fontSize: 14, color: Colors.text.muted, marginTop: 4 },
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.md,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.brand.cyanDim,
+    borderWidth: 1,
+    borderColor: Colors.brand.cyan + '40',
+  },
+  editProfileText: { color: Colors.brand.cyan, fontSize: 14, fontWeight: '600' },
   statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.md, backgroundColor: Colors.bg.surface, borderRadius: Radius.md, padding: Spacing.md },
   statItem: { alignItems: 'center', paddingHorizontal: 16 },
   statValue: { fontSize: 18, fontWeight: '800', color: Colors.text.primary },

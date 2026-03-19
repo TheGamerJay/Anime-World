@@ -11,6 +11,7 @@ import { seriesAPI, watchlistAPI, likeAPI, followAPI, paymentsAPI } from '../../
 import { useAuth } from '../../src/AuthContext';
 import { Series, Episode } from '../../src/types';
 import ReportModal from '../../src/ReportModal';
+import CommentsSection from '../../src/CommentsSection';
 
 function formatCount(num: number): string {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -290,9 +291,16 @@ export default function SeriesDetailScreen() {
             </View>
           ) : (
             episodes.map((ep) => (
-              <TouchableOpacity key={ep.id} style={styles.episodeItem} activeOpacity={0.8}>
+              <TouchableOpacity 
+                key={ep.id} 
+                style={styles.episodeItem} 
+                activeOpacity={0.8}
+                onPress={() => router.push(`/watch?episodeId=${ep.id}&seriesId=${series.id}`)}
+              >
                 <View style={styles.episodeLeft}>
-                  <Text style={styles.episodeNumber}>Ep {ep.episode_number}</Text>
+                  <Text style={styles.episodeNumber}>
+                    {(series as any).content_type === 'novel' ? 'Ch' : 'Ep'} {ep.episode_number}
+                  </Text>
                   <View style={styles.episodeInfo}>
                     <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
                     <Text style={styles.episodeViews}>{formatCount(ep.view_count)} views</Text>
@@ -303,11 +311,14 @@ export default function SeriesDetailScreen() {
                     <Ionicons name="star" size={12} color={Colors.brand.warning} />
                   </View>
                 )}
-                <Ionicons name="play-circle" size={32} color={Colors.brand.cyan} />
+                <Ionicons name={(series as any).content_type === 'novel' ? 'book' : 'play-circle'} size={32} color={Colors.brand.cyan} />
               </TouchableOpacity>
             ))
           )}
         </View>
+
+        {/* Comments Section */}
+        <CommentsSection contentType="series" contentId={id!} />
 
         <View style={{ height: 100 }} />
       </ScrollView>
