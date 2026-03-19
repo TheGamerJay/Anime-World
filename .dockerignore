@@ -1,0 +1,9 @@
+node_modules
+.git
+.emergent
+test_reports
+tests
+*.md
+design_guidelines.json
+test_result.md
+frontend/node_modules

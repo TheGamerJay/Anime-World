@@ -1,5 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -429,3 +431,18 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# Serve built Expo web frontend (for Railway/production deployment)
+FRONTEND_DIST = ROOT_DIR.parent / "frontend" / "dist"
+if FRONTEND_DIST.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIST)), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file_path = FRONTEND_DIST / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        index = FRONTEND_DIST / "index.html"
+        if index.exists():
+            return FileResponse(str(index))
+        return {"detail": "Not found"}
