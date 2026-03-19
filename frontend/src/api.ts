@@ -64,7 +64,15 @@ export const seriesAPI = {
 // Episodes
 export const episodeAPI = {
   create: (data: any) => apiCall('/episodes', { method: 'POST', body: data, auth: true }),
+  get: (id: string) => apiCall(`/episodes/${id}`),
   delete: (id: string) => apiCall(`/episodes/${id}`, { method: 'DELETE', auth: true }),
+};
+
+// Reports
+export const reportAPI = {
+  create: (data: { content_type: string; content_id: string; reason: string; details?: string }) =>
+    apiCall('/reports', { method: 'POST', body: data, auth: true }),
+  getMyReports: (status?: string) => apiCall(`/reports${status ? `?status=${status}` : ''}`, { auth: true }),
 };
 
 // Creators

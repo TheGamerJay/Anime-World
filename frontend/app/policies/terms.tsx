@@ -2,132 +2,117 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { Colors, Spacing } from '../../src/theme';
+import { useRouter, Stack } from 'expo-router';
+import { Colors, Spacing, Radius } from '../../src/theme';
 
 export default function TermsOfServiceScreen() {
   const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity testID="terms-back-btn" onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Terms of Service</Text>
         <View style={{ width: 40 }} />
       </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.lastUpdated}>Last Updated: March 18, 2026</Text>
 
-        <Text style={styles.sectionTitle}>1. Acceptance of Terms</Text>
-        <Text style={styles.body}>
-          By downloading, installing, accessing, or using the Anime World mobile application and related services (collectively, the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you must not use the Service.
-        </Text>
-        <Text style={styles.body}>
-          We reserve the right to modify these Terms at any time. Changes will be effective immediately upon posting. Your continued use of the Service constitutes acceptance of the modified Terms.
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.lastUpdated}>Last Updated: June 2025</Text>
+
+        <Text style={styles.sectionTitle}>📄 Agreement to Terms</Text>
+        <Text style={styles.paragraph}>
+          By accessing or using AnimeWorld ("the Platform"), you agree to be bound by these Terms of Service. AnimeWorld is a user-generated content platform for original anime, novels, and movies created by independent creators.
         </Text>
 
-        <Text style={styles.sectionTitle}>2. Eligibility</Text>
-        <Text style={styles.body}>
-          You must be at least 13 years old to use the Service. If you are under 18, you represent that you have your parent or guardian's permission to use the Service. By using the Service, you represent and warrant that you meet all eligibility requirements.
+        <Text style={styles.sectionTitle}>👤 User Accounts</Text>
+        <Text style={styles.paragraph}>
+          • You must be at least 13 years old to use the Platform{"\n"}
+          • You are responsible for maintaining account security{"\n"}
+          • One account per person is allowed{"\n"}
+          • You must provide accurate registration information{"\n"}
+          • Account sharing is prohibited
         </Text>
 
-        <Text style={styles.sectionTitle}>3. User Accounts</Text>
-        <Text style={styles.body}>
-          {'\u2022'} You are responsible for maintaining the confidentiality of your account credentials{'\n'}
-          {'\u2022'} You are responsible for all activities that occur under your account{'\n'}
-          {'\u2022'} You must provide accurate and complete information during registration{'\n'}
-          {'\u2022'} You must notify us immediately of any unauthorized use of your account{'\n'}
-          {'\u2022'} We reserve the right to suspend or terminate accounts that violate these Terms{'\n'}
-          {'\u2022'} One person may not maintain more than one account
+        <Text style={styles.sectionTitle}>🎨 Creator Terms</Text>
+        <Text style={styles.subTitle}>Content Ownership</Text>
+        <Text style={styles.paragraph}>
+          • You retain ownership of your original content{"\n"}
+          • You grant AnimeWorld a license to display and distribute your content{"\n"}
+          • You must have all rights to content you upload{"\n"}
+          • Uploading copyrighted content without permission is prohibited
         </Text>
 
-        <Text style={styles.sectionTitle}>4. Acceptable Use Policy</Text>
-        <Text style={styles.body}>
-          You agree NOT to:{'\n'}
-          {'\u2022'} Use the Service for any illegal purpose or in violation of any applicable law{'\n'}
-          {'\u2022'} Upload, transmit, or distribute harmful, offensive, or objectionable content{'\n'}
-          {'\u2022'} Attempt to gain unauthorized access to the Service or its related systems{'\n'}
-          {'\u2022'} Interfere with or disrupt the Service or servers connected to the Service{'\n'}
-          {'\u2022'} Use any automated means (bots, scrapers, crawlers) to access the Service{'\n'}
-          {'\u2022'} Reverse engineer, decompile, or disassemble any portion of the Service{'\n'}
-          {'\u2022'} Circumvent, disable, or interfere with security features of the Service{'\n'}
-          {'\u2022'} Impersonate any person or entity{'\n'}
-          {'\u2022'} Harvest or collect user information without consent{'\n'}
-          {'\u2022'} Use the Service to distribute spam, malware, or phishing content{'\n'}
-          {'\u2022'} Reproduce, distribute, or create derivative works of the Service content
+        <Text style={styles.subTitle}>Creator Responsibilities</Text>
+        <Text style={styles.paragraph}>
+          • Only upload ORIGINAL content you created{"\n"}
+          • Do not upload copyrighted anime, manga, or other media{"\n"}
+          • Properly label mature or sensitive content{"\n"}
+          • Respond to copyright claims within 48 hours{"\n"}
+          • Maintain accurate payment information for payouts
         </Text>
 
-        <Text style={styles.sectionTitle}>5. Content and Intellectual Property</Text>
-        <Text style={styles.body}>
-          All content available through the Service, including but not limited to text, graphics, logos, images, audio clips, video clips, data compilations, and software, is the property of Anime World or its content suppliers and is protected by international copyright, trademark, and other intellectual property laws.
-        </Text>
-        <Text style={styles.body}>
-          Anime data, images, and information displayed in the Service are sourced from third-party APIs and belong to their respective owners. We do not claim ownership of third-party content.
-        </Text>
-
-        <Text style={styles.sectionTitle}>6. User-Generated Content</Text>
-        <Text style={styles.body}>
-          By submitting content to the Service (reviews, comments, ratings), you grant us a worldwide, non-exclusive, royalty-free, transferable license to use, reproduce, distribute, and display such content in connection with the Service. You represent that you own or have the necessary rights to submit such content.
+        <Text style={styles.subTitle}>Revenue & Payouts</Text>
+        <Text style={styles.paragraph}>
+          • Creators receive 80% of tips and subscriptions{"\n"}
+          • Platform retains 20% as service fee{"\n"}
+          • Minimum payout threshold: $10{"\n"}
+          • Payouts processed via Stripe Connect{"\n"}
+          • Tax reporting is your responsibility
         </Text>
 
-        <Text style={styles.sectionTitle}>7. Third-Party Services and Advertising</Text>
-        <Text style={styles.body}>
-          The Service may contain advertisements provided by third parties, including Google AdSense. We are not responsible for the content of third-party advertisements. Your interactions with advertisers are solely between you and the advertiser.
-        </Text>
-        <Text style={styles.body}>
-          The Service may contain links to third-party websites or services that are not owned or controlled by Anime World. We have no control over, and assume no responsibility for, the content, privacy policies, or practices of any third-party websites or services.
-        </Text>
-
-        <Text style={styles.sectionTitle}>8. Disclaimer of Warranties</Text>
-        <Text style={styles.body}>
-          THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND COURSE OF DEALING.
-        </Text>
-        <Text style={styles.body}>
-          WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, TIMELY, SECURE, OR ERROR-FREE. WE DO NOT WARRANT THE ACCURACY OR COMPLETENESS OF ANY INFORMATION PROVIDED THROUGH THE SERVICE.
+        <Text style={styles.sectionTitle}>🚫 Prohibited Content</Text>
+        <Text style={styles.paragraph}>
+          The following content is strictly prohibited:{"\n\n"}
+          • Copyrighted content you don't own{"\n"}
+          • Content depicting minors inappropriately{"\n"}
+          • Hate speech or discrimination{"\n"}
+          • Graphic violence without proper warnings{"\n"}
+          • Spam or misleading content{"\n"}
+          • Malware or harmful code{"\n"}
+          • Content violating any laws
         </Text>
 
-        <Text style={styles.sectionTitle}>9. Limitation of Liability</Text>
-        <Text style={styles.body}>
-          TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL ANIME WORLD, ITS DIRECTORS, EMPLOYEES, PARTNERS, AGENTS, SUPPLIERS, OR AFFILIATES BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM:{'\n'}
-          {'\u2022'} Your access to or use of (or inability to access or use) the Service{'\n'}
-          {'\u2022'} Any conduct or content of any third party on the Service{'\n'}
-          {'\u2022'} Any content obtained from the Service{'\n'}
-          {'\u2022'} Unauthorized access, use, or alteration of your transmissions or content
+        <Text style={styles.sectionTitle}>💳 Payments & Subscriptions</Text>
+        <Text style={styles.paragraph}>
+          • All payments are processed through Stripe{"\n"}
+          • Subscriptions auto-renew unless cancelled{"\n"}
+          • Refunds handled on a case-by-case basis{"\n"}
+          • Tips are non-refundable{"\n"}
+          • Premium memberships: $4.99/month
         </Text>
 
-        <Text style={styles.sectionTitle}>10. Indemnification</Text>
-        <Text style={styles.body}>
-          You agree to defend, indemnify, and hold harmless Anime World and its officers, directors, employees, contractors, agents, licensors, and suppliers from and against any claims, actions, demands, liabilities, costs, and expenses (including reasonable attorneys' fees) arising out of or related to your use of the Service, your violation of these Terms, or your violation of any rights of another.
+        <Text style={styles.sectionTitle}>⚠️ Account Termination</Text>
+        <Text style={styles.paragraph}>
+          We may suspend or terminate accounts for:{"\n\n"}
+          • Violation of these terms{"\n"}
+          • Copyright infringement{"\n"}
+          • Fraudulent activity{"\n"}
+          • Harassment of other users{"\n"}
+          • Multiple reports of policy violations
         </Text>
 
-        <Text style={styles.sectionTitle}>11. Termination</Text>
-        <Text style={styles.body}>
-          We may terminate or suspend your account and access to the Service immediately, without prior notice or liability, for any reason, including breach of these Terms. Upon termination, your right to use the Service will cease immediately. All provisions of these Terms that should survive termination shall survive.
+        <Text style={styles.sectionTitle}>🛡️ Limitation of Liability</Text>
+        <Text style={styles.paragraph}>
+          AnimeWorld is provided "as is" without warranties. We are not liable for:{"\n\n"}
+          • User-generated content{"\n"}
+          • Service interruptions{"\n"}
+          • Data loss{"\n"}
+          • Third-party actions{"\n"}
+          • Indirect or consequential damages
         </Text>
 
-        <Text style={styles.sectionTitle}>12. Governing Law and Dispute Resolution</Text>
-        <Text style={styles.body}>
-          These Terms shall be governed by and construed in accordance with the laws of the United States, without regard to its conflict of law provisions. Any disputes arising from these Terms or the Service shall be resolved through binding arbitration in accordance with the rules of the American Arbitration Association.
+        <Text style={styles.sectionTitle}>🔄 Changes to Terms</Text>
+        <Text style={styles.paragraph}>
+          We may update these terms at any time. Continued use after changes constitutes acceptance. Material changes will be notified via email or app notification.
         </Text>
 
-        <Text style={styles.sectionTitle}>13. Severability</Text>
-        <Text style={styles.body}>
-          If any provision of these Terms is found to be unenforceable or invalid, that provision will be limited or eliminated to the minimum extent necessary so that these Terms will otherwise remain in full force and effect.
-        </Text>
-
-        <Text style={styles.sectionTitle}>14. Entire Agreement</Text>
-        <Text style={styles.body}>
-          These Terms, together with the Privacy Policy and any other legal notices published by us on the Service, constitute the entire agreement between you and Anime World concerning the Service.
-        </Text>
-
-        <Text style={styles.sectionTitle}>15. Contact Information</Text>
-        <Text style={styles.body}>
-          For questions about these Terms of Service, please contact us at:{'\n'}
-          {'\n'}Email: contact@animeworld.com{'\n'}
-          {'\n'}Anime World{'\n'}
-          United States
+        <Text style={styles.sectionTitle}>📧 Contact</Text>
+        <Text style={styles.paragraph}>
+          Questions about these terms?{"\n"}
+          Email: legal@animeworld.app
         </Text>
 
         <View style={{ height: 100 }} />
@@ -138,12 +123,16 @@ export default function TermsOfServiceScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.default },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary },
-  scrollView: { flex: 1 },
-  content: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
-  lastUpdated: { fontSize: 13, color: Colors.brand.cyan, fontWeight: '600', marginBottom: Spacing.lg },
+  content: { flex: 1, padding: Spacing.md },
+  lastUpdated: { fontSize: 12, color: Colors.text.muted, marginBottom: Spacing.lg, fontStyle: 'italic' },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary, marginTop: Spacing.lg, marginBottom: Spacing.sm },
-  body: { fontSize: 14, color: Colors.text.secondary, lineHeight: 22, marginBottom: Spacing.sm },
+  subTitle: { fontSize: 15, fontWeight: '600', color: Colors.brand.cyan, marginTop: Spacing.md, marginBottom: 4 },
+  paragraph: { fontSize: 14, color: Colors.text.secondary, lineHeight: 22 },
 });

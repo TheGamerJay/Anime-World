@@ -64,9 +64,17 @@ class EpisodeCreate(BaseModel):
     title: str
     description: Optional[str] = ""
     episode_number: int
-    video_url: str
+    video_url: Optional[str] = ""  # For series/movies
+    content_text: Optional[str] = ""  # For novels (chapter content)
     thumbnail_base64: Optional[str] = None
     is_premium: bool = False
+    arc_name: Optional[str] = None  # For grouping into arcs
+
+class ReportCreate(BaseModel):
+    content_type: str  # series, episode, user
+    content_id: str
+    reason: str  # copyright, inappropriate, spam, harassment, other
+    details: Optional[str] = ""
 
 class TipRequest(BaseModel):
     creator_id: str
@@ -264,11 +272,18 @@ async def create_episode(data: EpisodeCreate, user=Depends(get_current_user)):
     series = await db.series.find_one({"id": data.series_id, "creator_id": user["id"]}, {"_id": 0})
     if not series:
         raise HTTPException(status_code=404, detail="Series not found or not yours")
+    
+    # Determine content label based on series type
+    content_type = series.get("content_type", "series")
+    
     ep_id = str(uuid.uuid4())
     ep_doc = {
         "id": ep_id, "series_id": data.series_id, "creator_id": user["id"],
         "title": data.title, "description": data.description,
-        "episode_number": data.episode_number, "video_url": data.video_url,
+        "episode_number": data.episode_number, 
+        "video_url": data.video_url or "",
+        "content_text": data.content_text or "",  # For novel chapters
+        "arc_name": data.arc_name,  # Arc grouping
         "thumbnail_base64": data.thumbnail_base64 or series.get("thumbnail_base64"),
         "is_premium": data.is_premium, "view_count": 0, "like_count": 0,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -278,6 +293,16 @@ async def create_episode(data: EpisodeCreate, user=Depends(get_current_user)):
     ep_doc.pop("_id", None)
     return ep_doc
 
+@api_router.get("/episodes/{episode_id}")
+async def get_episode(episode_id: str):
+    ep = await db.series_episodes.find_one({"id": episode_id}, {"_id": 0})
+    if not ep:
+        raise HTTPException(status_code=404, detail="Episode not found")
+    # Increment view
+    await db.series_episodes.update_one({"id": episode_id}, {"$inc": {"view_count": 1}})
+    await db.series.update_one({"id": ep["series_id"]}, {"$inc": {"view_count": 1}})
+    return ep
+
 @api_router.delete("/episodes/{episode_id}")
 async def delete_episode(episode_id: str, user=Depends(get_current_user)):
     ep = await db.series_episodes.find_one({"id": episode_id, "creator_id": user["id"]}, {"_id": 0})
@@ -286,6 +311,49 @@ async def delete_episode(episode_id: str, user=Depends(get_current_user)):
     await db.series_episodes.delete_one({"id": episode_id})
     await db.series.update_one({"id": ep["series_id"]}, {"$inc": {"episode_count": -1}})
     return {"message": "Episode deleted"}
+
+# ============ REPORT SYSTEM ============
+@api_router.post("/reports")
+async def create_report(data: ReportCreate, user=Depends(get_current_user)):
+    # Validate content exists
+    if data.content_type == "series":
+        content = await db.series.find_one({"id": data.content_id}, {"_id": 0})
+    elif data.content_type == "episode":
+        content = await db.series_episodes.find_one({"id": data.content_id}, {"_id": 0})
+    elif data.content_type == "user":
+        content = await db.users.find_one({"id": data.content_id}, {"_id": 0, "password_hash": 0})
+    else:
+        raise HTTPException(status_code=400, detail="Invalid content type")
+    
+    if not content:
+        raise HTTPException(status_code=404, detail="Content not found")
+    
+    report_id = str(uuid.uuid4())
+    report_doc = {
+        "id": report_id,
+        "reporter_id": user["id"],
+        "reporter_username": user["username"],
+        "content_type": data.content_type,
+        "content_id": data.content_id,
+        "content_title": content.get("title") or content.get("username", "Unknown"),
+        "content_creator_id": content.get("creator_id") or content.get("id"),
+        "reason": data.reason,
+        "details": data.details,
+        "status": "pending",  # pending, reviewed, resolved, dismissed
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.reports.insert_one(report_doc)
+    report_doc.pop("_id", None)
+    return {"message": "Report submitted successfully", "report_id": report_id}
+
+@api_router.get("/reports")
+async def get_reports(status: Optional[str] = None, user=Depends(get_current_user)):
+    # For now, creators can see reports against their content
+    query = {"content_creator_id": user["id"]}
+    if status:
+        query["status"] = status
+    reports = await db.reports.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"reports": reports}
 
 # ============ CREATOR PROFILE ============
 @api_router.get("/creators/{user_id}")

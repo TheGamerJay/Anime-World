@@ -2,88 +2,101 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { Colors, Spacing } from '../../src/theme';
+import { useRouter, Stack } from 'expo-router';
+import { Colors, Spacing, Radius } from '../../src/theme';
 
 export default function CookiePolicyScreen() {
   const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={styles.header}>
-        <TouchableOpacity testID="cookies-back-btn" onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color={Colors.text.primary} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Cookie Policy</Text>
         <View style={{ width: 40 }} />
       </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.lastUpdated}>Last Updated: March 18, 2026</Text>
 
-        <Text style={styles.sectionTitle}>What Are Cookies?</Text>
-        <Text style={styles.body}>
-          Cookies are small text files that are stored on your device when you visit a website or use an application. They are widely used to make websites and applications work more efficiently, provide a better user experience, and provide information to the owners of the site or app.
-        </Text>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <Text style={styles.lastUpdated}>Last Updated: June 2025</Text>
 
-        <Text style={styles.sectionTitle}>How We Use Cookies</Text>
-        <Text style={styles.body}>
-          Anime World uses cookies and similar technologies for the following purposes:
-        </Text>
-        <Text style={styles.subTitle}>Essential Cookies</Text>
-        <Text style={styles.body}>
-          These cookies are necessary for the Service to function properly. They enable core functionality such as user authentication, security, and session management. Without these cookies, the Service cannot function correctly. You cannot opt out of essential cookies.
-        </Text>
-        <Text style={styles.subTitle}>Performance and Analytics Cookies</Text>
-        <Text style={styles.body}>
-          These cookies help us understand how users interact with our Service by collecting and reporting information anonymously. This data helps us improve the performance and usability of our Service.
-        </Text>
-        <Text style={styles.subTitle}>Functionality Cookies</Text>
-        <Text style={styles.body}>
-          These cookies allow the Service to remember choices you make (such as your username, language, or region) and provide enhanced, personalized features. They may also be used to provide services you have asked for, such as watching a video or commenting on a blog.
-        </Text>
-        <Text style={styles.subTitle}>Advertising Cookies</Text>
-        <Text style={styles.body}>
-          These cookies are used to deliver advertisements that are relevant to you and your interests. They are also used to limit the number of times you see an advertisement and to help measure the effectiveness of advertising campaigns. They are placed by advertising networks with our permission, including Google AdSense.
+        <Text style={styles.sectionTitle}>🍪 What Are Cookies?</Text>
+        <Text style={styles.paragraph}>
+          Cookies are small text files stored on your device when you use our platform. They help us provide a better experience by remembering your preferences and login status.
         </Text>
 
-        <Text style={styles.sectionTitle}>Third-Party Cookies</Text>
-        <Text style={styles.body}>
-          In addition to our own cookies, we may also use various third-party cookies to report usage statistics, deliver advertisements, and so on. These may include:{'\n'}
-          {'\n'}{'\u2022'} Google AdSense / Google Ads - for personalized advertising{'\n'}
-          {'\u2022'} Google Analytics - for usage analytics and reporting{'\n'}
-          {'\u2022'} DoubleClick (by Google) - for ad serving and tracking{'\n'}
-          {'\n'}These third-party services have their own privacy policies addressing how they use such information.
+        <Text style={styles.sectionTitle}>📊 Types of Cookies We Use</Text>
+        
+        <Text style={styles.subTitle}>✅ Essential Cookies</Text>
+        <Text style={styles.paragraph}>
+          Required for the platform to function. These cannot be disabled.{"\n"}
+          • Authentication tokens{"\n"}
+          • Session management{"\n"}
+          • Security features{"\n"}
+          • Load balancing
         </Text>
 
-        <Text style={styles.sectionTitle}>Google AdSense and DoubleClick Cookie</Text>
-        <Text style={styles.body}>
-          Google, as a third-party vendor, uses cookies (including the DoubleClick cookie) to serve ads based on your prior visits to our Service and other websites. Google's use of advertising cookies enables it and its partners to serve ads to you based on your visit to our Service and/or other sites on the Internet.
-        </Text>
-        <Text style={styles.body}>
-          You may opt out of personalized advertising by visiting Google's Ads Settings at https://adssettings.google.com. Alternatively, you can opt out of a third-party vendor's use of cookies for personalized advertising by visiting https://www.aboutads.info/choices.
-        </Text>
-
-        <Text style={styles.sectionTitle}>Managing Cookies</Text>
-        <Text style={styles.body}>
-          You can control and manage cookies in various ways. Please note that removing or blocking cookies can impact your user experience.{'\n'}
-          {'\n'}{'\u2022'} Browser Settings: Most browsers allow you to view, manage, delete, and block cookies. Be aware that if you delete all cookies, your preferences and settings will be lost{'\n'}
-          {'\u2022'} Device Settings: Your mobile device may provide settings to manage cookies and tracking technologies{'\n'}
-          {'\u2022'} Opt-Out Tools: You can use opt-out tools provided by advertising industry bodies such as the Network Advertising Initiative (https://optout.networkadvertising.org) or the Digital Advertising Alliance (https://optout.aboutads.info)
+        <Text style={styles.subTitle}>📊 Analytics Cookies</Text>
+        <Text style={styles.paragraph}>
+          Help us understand how users interact with the platform.{"\n"}
+          • Page views and navigation{"\n"}
+          • Feature usage{"\n"}
+          • Error tracking{"\n"}
+          • Performance monitoring
         </Text>
 
-        <Text style={styles.sectionTitle}>Do Not Track Signals</Text>
-        <Text style={styles.body}>
-          Some browsers incorporate a Do Not Track (DNT) feature that signals to websites that you do not want to be tracked. Because there is not yet a common understanding of how to interpret the DNT signal, our Service does not currently respond to browser DNT signals. However, you can use the range of other tools provided to control data collection and use.
+        <Text style={styles.subTitle}>⚙️ Preference Cookies</Text>
+        <Text style={styles.paragraph}>
+          Remember your settings and preferences.{"\n"}
+          • Language preferences{"\n"}
+          • Theme settings{"\n"}
+          • Playback preferences{"\n"}
+          • Content filters
         </Text>
 
-        <Text style={styles.sectionTitle}>Updates to This Cookie Policy</Text>
-        <Text style={styles.body}>
-          We may update this Cookie Policy from time to time to reflect changes in the cookies we use or for other operational, legal, or regulatory reasons. Please revisit this policy regularly to stay informed about our use of cookies.
+        <Text style={styles.subTitle}>🎯 Personalization Cookies</Text>
+        <Text style={styles.paragraph}>
+          Used to personalize your experience.{"\n"}
+          • Content recommendations{"\n"}
+          • Creator suggestions{"\n"}
+          • Watch history
         </Text>
 
-        <Text style={styles.sectionTitle}>Contact Us</Text>
-        <Text style={styles.body}>
-          If you have questions about our use of cookies, please contact us at contact@animeworld.com.
+        <Text style={styles.sectionTitle}>📱 Mobile App Storage</Text>
+        <Text style={styles.paragraph}>
+          In our mobile app, we use similar technologies:{"\n\n"}
+          • <Text style={styles.bold}>AsyncStorage:</Text> For storing preferences locally{"\n"}
+          • <Text style={styles.bold}>SecureStore:</Text> For sensitive data like auth tokens{"\n"}
+          • <Text style={styles.bold}>Cache:</Text> For offline content access
+        </Text>
+
+        <Text style={styles.sectionTitle}>🤝 Third-Party Cookies</Text>
+        <Text style={styles.paragraph}>
+          We use services that may set their own cookies:{"\n\n"}
+          • <Text style={styles.bold}>Stripe:</Text> Payment processing{"\n"}
+          • <Text style={styles.bold}>Analytics:</Text> Usage tracking{"\n"}
+          • <Text style={styles.bold}>CDN:</Text> Content delivery
+        </Text>
+
+        <Text style={styles.sectionTitle}>🔧 Managing Cookies</Text>
+        <Text style={styles.paragraph}>
+          You can control cookies through:{"\n\n"}
+          • Browser settings to block/delete cookies{"\n"}
+          • App settings for preferences{"\n"}
+          • Device settings for app data{"\n\n"}
+          Note: Disabling essential cookies may prevent the platform from working correctly.
+        </Text>
+
+        <Text style={styles.sectionTitle}>🔄 Updates</Text>
+        <Text style={styles.paragraph}>
+          We may update this policy as our platform evolves. Check back periodically for changes.
+        </Text>
+
+        <Text style={styles.sectionTitle}>📧 Questions?</Text>
+        <Text style={styles.paragraph}>
+          Contact us at: privacy@animeworld.app
         </Text>
 
         <View style={{ height: 100 }} />
@@ -94,13 +107,17 @@ export default function CookiePolicyScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg.default },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary },
-  scrollView: { flex: 1 },
-  content: { paddingHorizontal: Spacing.md, paddingTop: Spacing.md },
-  lastUpdated: { fontSize: 13, color: Colors.brand.cyan, fontWeight: '600', marginBottom: Spacing.lg },
+  content: { flex: 1, padding: Spacing.md },
+  lastUpdated: { fontSize: 12, color: Colors.text.muted, marginBottom: Spacing.lg, fontStyle: 'italic' },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.text.primary, marginTop: Spacing.lg, marginBottom: Spacing.sm },
-  subTitle: { fontSize: 15, fontWeight: '600', color: Colors.brand.pink, marginTop: Spacing.md, marginBottom: Spacing.xs },
-  body: { fontSize: 14, color: Colors.text.secondary, lineHeight: 22, marginBottom: Spacing.sm },
+  subTitle: { fontSize: 15, fontWeight: '600', color: Colors.brand.cyan, marginTop: Spacing.md, marginBottom: 4 },
+  paragraph: { fontSize: 14, color: Colors.text.secondary, lineHeight: 22 },
+  bold: { fontWeight: '700', color: Colors.text.primary },
 });

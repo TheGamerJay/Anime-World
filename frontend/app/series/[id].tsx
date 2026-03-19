@@ -10,6 +10,7 @@ import { Colors, Spacing, Radius } from '../../src/theme';
 import { seriesAPI, watchlistAPI, likeAPI, followAPI, paymentsAPI } from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import { Series, Episode } from '../../src/types';
+import ReportModal from '../../src/ReportModal';
 
 function formatCount(num: number): string {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -32,6 +33,7 @@ export default function SeriesDetailScreen() {
   const [isLiked, setIsLiked] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     loadSeries();
@@ -257,13 +259,30 @@ export default function SeriesDetailScreen() {
                 <Ionicons name="gift" size={24} color={Colors.brand.warning} />
                 <Text style={styles.actionText}>Tip</Text>
               </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowReportModal(true)} style={styles.actionBtn}>
+                <Ionicons name="flag-outline" size={24} color={Colors.brand.error} />
+                <Text style={styles.actionText}>Report</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Episodes */}
+        {/* Episodes/Chapters Section */}
         <View style={styles.episodesSection}>
-          <Text style={styles.sectionTitle}>Episodes</Text>
+          <View style={styles.episodesHeader}>
+            <Text style={styles.sectionTitle}>
+              {(series as any).content_type === 'novel' ? 'Chapters' : (series as any).content_type === 'movie' ? 'Parts' : 'Episodes'}
+            </Text>
+            {user?.id === series.creator_id && (
+              <TouchableOpacity 
+                onPress={() => router.push(`/add-episode?seriesId=${series.id}`)}
+                style={styles.addEpisodeBtn}
+              >
+                <Ionicons name="add" size={20} color={Colors.brand.cyan} />
+                <Text style={styles.addEpisodeText}>Add</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           {episodes.length === 0 ? (
             <View style={styles.noEpisodes}>
               <Ionicons name="film-outline" size={40} color={Colors.text.muted} />
@@ -292,6 +311,15 @@ export default function SeriesDetailScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="series"
+        contentId={id!}
+        contentTitle={series?.title || 'Unknown'}
+      />
     </SafeAreaView>
   );
 }
@@ -334,7 +362,10 @@ const styles = StyleSheet.create({
   actionBtn: { alignItems: 'center', gap: 4 },
   actionText: { color: Colors.text.secondary, fontSize: 12 },
   episodesSection: { padding: Spacing.md },
-  sectionTitle: { fontSize: 20, fontWeight: '700', color: Colors.text.primary, marginBottom: 16 },
+  episodesHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: '700', color: Colors.text.primary },
+  addEpisodeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: Colors.brand.cyanDim },
+  addEpisodeText: { color: Colors.brand.cyan, fontSize: 13, fontWeight: '600' },
   noEpisodes: { alignItems: 'center', paddingVertical: 40, gap: 12 },
   noEpisodesText: { color: Colors.text.muted, fontSize: 14 },
   episodeItem: {
